@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TopBar } from './components/TopBar';
+import { DetailScreen } from './components/detail/DetailScreen';
 import { Toast } from './components/ui/Toast';
 import { WorklistScreen } from './components/worklist/WorklistScreen';
-import { downloadLetter, visibleSorted } from './lib/worklist';
+import { downloadLetter, effectiveStatus, visibleSorted } from './lib/worklist';
 import {
   NO_FILTERS,
   type FilterKey, type FilterState, type Screen, type SortCol,
@@ -26,13 +27,6 @@ export default function App({ data }: { data: WorkbenchData }) {
     toastTimer.current = setTimeout(() => setToast(''), 2600);
   }, []);
   useEffect(() => () => clearTimeout(toastTimer.current), []);
-
-  // activeId/setLetters/setStatusOverrides are wired for Tasks 5-6 (detail
-  // screen) but unused by the worklist screen itself; keep tsc's
-  // noUnusedLocals quiet without changing behavior.
-  void activeId;
-  void setLetters;
-  void setStatusOverrides;
 
   const sorted = useMemo(
     () => visibleSorted(data.claims, filters, sort, statusOverrides),
@@ -65,7 +59,38 @@ export default function App({ data }: { data: WorkbenchData }) {
 
   let body: JSX.Element;
   if (screen === 'detail') {
-    body = <div>detail placeholder</div>; // Task 5
+    const claim = data.claims.find((c) => c.id === activeId) ?? data.claims[0];
+    if (!claim) {
+      body = <div className="detail">No claims in this batch.</div>;
+    } else {
+      body = (
+        <DetailScreen
+          claim={claim}
+          status={effectiveStatus(claim, statusOverrides)}
+          model={data.model}
+          generatedOn={data.generatedOn}
+          letter={letters[claim.id] ?? claim.letter ?? ''}
+          onBack={() => setScreen('worklist')}
+          onLetterChange={(text) => setLetters((l) => ({ ...l, [claim.id]: text }))}
+          onApprove={() => {
+            setStatusOverrides((o) => ({ ...o, [claim.id]: 'Submitted' }));
+            showToast(`${claim.id} approved — marked Submitted (this session only)`);
+          }}
+          onRevert={() => {
+            setLetters((l) => {
+              const next = { ...l };
+              delete next[claim.id];
+              return next;
+            });
+            showToast('Draft reverted to the generated letter');
+          }}
+          onExport={() => {
+            downloadLetter(claim, letters[claim.id]);
+            showToast(`Exported ${claim.id}-appeal.md`);
+          }}
+        />
+      );
+    }
   } else if (screen === 'summary') {
     body = <div>summary placeholder</div>; // Task 6
   } else {
