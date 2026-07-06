@@ -59,6 +59,21 @@ def worklist_payload(
     }
 
 
+def load_worklist(path: Path) -> tuple[dict, BatchResult]:
+    """Read a prior run's worklist.json back into a BatchResult.
+
+    Returns (raw payload, validated BatchResult). Raises ValueError when the
+    file isn't an Overturn worklist document.
+    """
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or "batch" not in payload:
+        raise ValueError(
+            f"{path} is not an Overturn worklist file "
+            f"(expected a document with schema {WORKLIST_SCHEMA!r})"
+        )
+    return payload, BatchResult.model_validate(payload["batch"])
+
+
 def write_results(
     output_dir: Path,
     result: BatchResult,

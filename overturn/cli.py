@@ -21,11 +21,17 @@ from rich.panel import Panel
 
 from overturn.pipeline import (
     build_agent,
+    load_worklist,
     run_batch,
     worklist_payload,
     write_results,
 )
-from overturn.render import build_worklist_table, format_money
+from overturn.render import (
+    build_carc_table,
+    build_deadline_table,
+    build_worklist_table,
+    format_money,
+)
 
 app = typer.Typer(
     add_completion=False,
@@ -182,6 +188,37 @@ def demo(
         "[dim]Synthetic data only — Overturn is a demonstration system, "
         "not production RCM software.[/dim]"
     )
+
+
+@app.command()
+def summary(
+    worklist_file: Path = typer.Argument(
+        ..., exists=True, dir_okay=False, readable=True,
+        help="worklist.json from a prior `overturn run`",
+    ),
+    as_of: Optional[str] = typer.Option(
+        None, "--as-of", metavar="YYYY-MM-DD",
+        help="Compute deadline buckets relative to this date (default: today)",
+    ),
+) -> None:
+    """Print batch stats from a prior run's worklist.json."""
+    today = date.fromisoformat(as_of) if as_of else date.today()
+    try:
+        payload, result = load_worklist(worklist_file)
+    except (ValueError, json.JSONDecodeError) as exc:
+        _fail(str(exc))
+
+    batch = result.summary
+    console.print(
+        f"[bold]Batch of {batch.total_records} records[/bold] "
+        f"(generated {payload.get('generated_on', 'unknown date')}) — "
+        f"{batch.succeeded} drafted, {batch.failed} failed"
+    )
+    console.print(
+        f"Total dollars at stake: [bold]{format_money(batch.total_billed_amount)}[/bold]\n"
+    )
+    console.print(build_carc_table(batch.records_by_carc, batch.billed_by_carc))
+    console.print(build_deadline_table(result.outcomes, today=today))
 
 
 def _redaction_stats(audit_path: Path) -> tuple[int, int]:

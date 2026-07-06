@@ -20,6 +20,60 @@ def format_money(amount: float) -> str:
     return f"${amount:,.2f}"
 
 
+DEADLINE_BUCKETS = ("Overdue", "<7 days", "<30 days", "30+ days", "No deadline")
+
+
+def deadline_bucket(days: float) -> str:
+    """Bucket a days_until_deadline value for the summary view."""
+    if days == float("inf"):
+        return "No deadline"
+    if days < 0:
+        return "Overdue"
+    if days < 7:
+        return "<7 days"
+    if days < 30:
+        return "<30 days"
+    return "30+ days"
+
+
+def build_carc_table(
+    records_by_carc: dict[str, int], billed_by_carc: dict[str, float]
+) -> Table:
+    """Per-CARC rollup, largest dollars first."""
+    table = Table(title="Records by CARC group")
+    table.add_column("CARC", no_wrap=True)
+    table.add_column("Records", justify="right")
+    table.add_column("Billed", justify="right")
+    for carc in sorted(billed_by_carc, key=billed_by_carc.get, reverse=True):
+        table.add_row(
+            carc, str(records_by_carc[carc]), format_money(billed_by_carc[carc])
+        )
+    return table
+
+
+def build_deadline_table(
+    outcomes: Sequence[RecordOutcome], *, today: date
+) -> Table:
+    """Deadline-proximity buckets over a batch's records."""
+    counts = {bucket: 0 for bucket in DEADLINE_BUCKETS}
+    billed = {bucket: 0.0 for bucket in DEADLINE_BUCKETS}
+    for outcome in outcomes:
+        bucket = deadline_bucket(days_until_deadline(outcome.record, today=today))
+        counts[bucket] += 1
+        billed[bucket] += outcome.record.billed_amount
+
+    table = Table(title=f"Appeal deadlines (as of {today})")
+    table.add_column("Bucket")
+    table.add_column("Records", justify="right")
+    table.add_column("Billed", justify="right")
+    for bucket in DEADLINE_BUCKETS:
+        style = "red" if bucket == "Overdue" and counts[bucket] else None
+        table.add_row(
+            bucket, str(counts[bucket]), format_money(billed[bucket]), style=style
+        )
+    return table
+
+
 def build_worklist_table(
     worklist: Sequence[RecordOutcome], *, today: date
 ) -> Table:
