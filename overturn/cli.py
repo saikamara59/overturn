@@ -191,6 +191,43 @@ def demo(
 
 
 @app.command()
+def report(
+    source: Path = typer.Argument(
+        ..., exists=True, readable=True,
+        help="worklist.json from a prior run, or the results directory containing it",
+    ),
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o",
+        help="Where to write the HTML (default: workbench.html next to worklist.json)",
+    ),
+    as_of: Optional[str] = typer.Option(
+        None, "--as-of", metavar="YYYY-MM-DD",
+        help="Compute deadlines relative to this date (default: today)",
+    ),
+    open_browser: bool = typer.Option(
+        False, "--open", help="Open the report in the default browser"
+    ),
+) -> None:
+    """Render an interactive Denial Workbench (HTML) from a prior run."""
+    from overturn.report import write_report
+
+    worklist_path = source / "worklist.json" if source.is_dir() else source
+    if not worklist_path.exists():
+        _fail(f"no worklist.json found in {source}")
+    today = date.fromisoformat(as_of) if as_of else date.today()
+    output_path = output or worklist_path.parent / "workbench.html"
+
+    try:
+        write_report(worklist_path, output_path, today=today)
+    except (ValueError, json.JSONDecodeError) as exc:
+        _fail(f"could not build report: {exc}")
+
+    console.print(f"Workbench written to [bold]{output_path}[/bold]")
+    if open_browser:
+        typer.launch(output_path.resolve().as_uri())
+
+
+@app.command()
 def summary(
     worklist_file: Path = typer.Argument(
         ..., exists=True, dir_okay=False, readable=True,

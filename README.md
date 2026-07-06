@@ -65,7 +65,18 @@ overturn run denials.csv --output-dir results [--limit N] [--json] [--dry-run]
 
 # Batch stats from a prior run:
 overturn summary results/worklist.json
+
+# Interactive HTML Denial Workbench from a prior run (self-contained file):
+overturn report results/ --open
 ```
+
+`overturn report` renders the run into a single-file web workbench: a
+filterable, sortable worklist; a claim-detail view showing the parsed denial
+(CARC/RARC codes, redaction boundary) beside the editable drafted appeal
+letter with export; and a batch-summary view with dollars-at-stake by CARC,
+deadline distribution, and the full audit trail from `audit.jsonl`. Letter
+edits and approvals in the workbench are session-local working state — the
+files on disk are not modified.
 
 `overturn run` writes to the output directory:
 

@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overturn — Denial Workbench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&family=Spline+Sans+Mono:wght@400..700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F7F7F5; --ink: #1C1B18; --ink-2: #44423C; --ink-3: #6B6860;
+    --mut: #8A867C; --mut-2: #A5A196; --line: #EBEAE5; --line-2: #ECEBE6;
+    --line-3: #EFEDE8; --line-row: #F0EEE9; --hover: #F6F5F1; --fill: #F0EFEA;
+    --accent: #2E5BDA; --accent-dn: #2549B8;
+    --red-bg: #FBEAE8; --red-fg: #A02D22; --red-dot: #C24437;
+    --amber-bg: #FBF3DC; --amber-fg: #8A6116; --amber-dot: #C29229;
+    --gray-bg: #EDECE7; --gray-fg: #5B584F; --gray-dot: #8F8B80;
+    --blue-bg: #EDF2FD; --blue-fg: #2B4FA8; --blue-dot: #3B66D0;
+    --green-bg: #E9F3EC; --green-fg: #1F6B3D; --green-dot: #3B8F5E;
+    --sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+    --mono: 'Spline Sans Mono', ui-monospace, SFMono-Regular, monospace;
+    --card-shadow: 0 1px 2px rgba(24,24,21,0.04), 0 6px 16px rgba(24,24,21,0.04);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); }
+  body { font-family: var(--sans); color: var(--ink); }
+  ::selection { background: #D8E0F7; }
+  button { font-family: inherit; cursor: pointer; }
+  #app { min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* ---- top bar ---- */
+  .topbar { height: 56px; flex: none; background: #191917; display: flex; align-items: center; padding: 0 20px; gap: 20px; }
+  .brand { display: flex; align-items: center; gap: 9px; }
+  .brand-mark { width: 26px; height: 26px; border-radius: 6px; background: var(--accent); display: flex; align-items: center; justify-content: center; }
+  .brand-name { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; color: #FFF; }
+  .topbar-rule { width: 1px; height: 22px; background: rgba(255,255,255,0.16); }
+  .tabs { display: flex; gap: 4px; }
+  .tab { border: none; font-size: 13px; font-weight: 550; padding: 6px 12px; border-radius: 6px; color: #A3A199; background: transparent; }
+  .tab:hover { background: rgba(255,255,255,0.08); }
+  .tab.on { color: #FFF; background: rgba(255,255,255,0.14); }
+  .topbar-meta { font-family: var(--mono); font-size: 11.5px; color: #908E85; }
+  .spacer { flex: 1; }
+
+  /* ---- chips / pills ---- */
+  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .st { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .st .dot { width: 6px; height: 6px; border-radius: 999px; }
+  .c-red   { background: var(--red-bg);   color: var(--red-fg); }
+  .c-amber { background: var(--amber-bg); color: var(--amber-fg); }
+  .c-gray  { background: var(--gray-bg);  color: var(--gray-fg); }
+  .c-blue  { background: var(--blue-bg);  color: var(--blue-fg); }
+  .c-green { background: var(--green-bg); color: var(--green-fg); }
+
+  /* ---- worklist layout ---- */
+  .wl { flex: 1; display: flex; min-height: 0; }
+  .rail { width: 222px; flex: none; border-right: 1px solid var(--line); padding: 16px 12px; overflow-y: auto; }
+  .rail-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 6px 4px; }
+  .rail-title { font-size: 11px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mut); }
+  .rail-reset { border: none; background: none; font-size: 11.5px; font-weight: 550; color: var(--accent); padding: 0; }
+  .fgroup { margin-top: 14px; }
+  .fgroup-title { font-size: 10.5px; font-weight: 650; letter-spacing: 0.07em; text-transform: uppercase; color: var(--mut-2); padding: 0 6px 6px; }
+  .fitem { display: flex; align-items: center; gap: 8px; width: 100%; border: none; background: none; text-align: left; padding: 4.5px 6px; border-radius: 6px; }
+  .fitem:hover { background: var(--fill); }
+  .fitem-label { flex: 1; font-size: 12.5px; font-weight: 500; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fitem-count { font-family: var(--mono); font-size: 11px; color: var(--mut-2); }
+  .cbox { width: 14px; height: 14px; flex: none; border-radius: 4px; border: 1.5px solid #C9C6BE; background: #FFF; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+  .cbox svg { opacity: 0; }
+  .cbox.on { border-color: var(--accent); background: var(--accent); }
+  .cbox.on svg { opacity: 1; }
+
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+  .stats { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 14px 28px; padding: 14px 20px 12px; }
+  .stat-label { font-size: 10.5px; font-weight: 650; letter-spacing: 0.07em; text-transform: uppercase; color: var(--mut); white-space: nowrap; }
+  .stat-value { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 21px; font-weight: 600; margin-top: 2px; white-space: nowrap; }
+  .stat-value small { font-size: 12px; font-weight: 500; color: var(--mut); }
+  .stat-pills { display: flex; gap: 6px; margin-top: 5px; }
+  .shown { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 550; margin-top: 4px; color: var(--ink-2); }
+
+  .bulk { flex: none; margin: 0 20px 10px; background: #1E1E1B; border-radius: 10px; box-shadow: 0 8px 24px rgba(24,24,21,0.18); display: flex; align-items: center; gap: 14px; padding: 8px 8px 8px 16px; }
+  .bulk-label { font-size: 13px; font-weight: 550; color: #FFF; font-variant-numeric: tabular-nums; }
+  .bulk-value { font-family: var(--mono); font-size: 12px; color: var(--mut-2); font-variant-numeric: tabular-nums; }
+  .bulk-clear { border: none; background: none; font-size: 12.5px; font-weight: 550; color: var(--mut-2); padding: 6px 10px; }
+  .bulk-clear:hover { color: #FFF; }
+
+  .btn-primary { border: none; font-size: 13px; font-weight: 600; color: #FFF; background: var(--accent); border-radius: 8px; padding: 7px 14px; box-shadow: 0 1px 2px rgba(46,91,218,0.4); }
+  .btn-primary:hover { background: var(--accent-dn); }
+  .btn { border: 1px solid #DBD8D1; font-size: 13px; font-weight: 550; color: var(--ink-2); background: #FFF; border-radius: 8px; padding: 6px 13px; display: inline-flex; align-items: center; gap: 6px; }
+  .btn:hover { background: var(--hover); }
+
+  .table-wrap { flex: 1; min-height: 0; overflow: auto; padding: 0 20px 20px; }
+  .card { background: #FFF; border: 1px solid var(--line-2); border-radius: 12px; box-shadow: var(--card-shadow); overflow: hidden; }
+  .table-card { min-width: 1080px; }
+  .trow { display: grid; grid-template-columns: 36px 132px 148px minmax(200px,1fr) 100px 96px 96px 108px 128px; align-items: center; }
+  .thead { background: #FCFCFB; border-bottom: 1px solid var(--line-2); }
+  .th { padding: 9px 12px; font-size: 10.5px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mut); text-align: left; border: none; background: none; }
+  button.th:hover { color: var(--ink); }
+  .th.num { text-align: right; }
+  .tbody-row { border-bottom: 1px solid var(--line-row); cursor: pointer; transition: background 0.12s ease; background: #FFF; }
+  .tbody-row:hover { background: var(--hover); }
+  .tbody-row.sel { background: #EEF2FC; }
+  .td { padding: 12px; font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .td-check { padding: 12px 0 12px 12px; }
+  .td-id { font-family: var(--mono); font-size: 12.5px; font-weight: 500; color: var(--ink); }
+  .td-carc { min-width: 0; }
+  .td-carc .code { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--ink); }
+  .td-carc .why { font-size: 12.5px; color: var(--mut); }
+  .td-num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 550; }
+  .td-date { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--ink-3); }
+
+  /* ---- detail ---- */
+  .detail { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 24px 28px; }
+  .backlink { border: none; background: none; font-size: 12.5px; font-weight: 550; color: var(--ink-3); padding: 2px 0; display: flex; align-items: center; gap: 5px; }
+  .backlink:hover { color: var(--ink); }
+  .d-head { display: flex; align-items: center; gap: 14px; margin: 10px 0 16px; flex-wrap: wrap; }
+  .d-id { font-family: var(--mono); font-size: 20px; font-weight: 600; }
+  .d-payer { font-size: 13px; color: var(--ink-3); }
+  .d-billed { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 600; }
+  .d-grid { display: grid; grid-template-columns: minmax(380px,5fr) minmax(420px,6fr); gap: 16px; align-items: start; }
+  @media (max-width: 980px) { .d-grid { grid-template-columns: 1fr; } }
+  .card-head { padding: 13px 18px 11px; border-bottom: 1px solid var(--line-3); display: flex; align-items: baseline; justify-content: space-between; }
+  .card-title { font-size: 13.5px; font-weight: 650; }
+  .card-sub { font-family: var(--mono); font-size: 11px; color: var(--mut-2); }
+  .kv { padding: 14px 18px 6px; display: grid; grid-template-columns: 150px 1fr; row-gap: 9px; font-size: 13px; }
+  .kv .k { color: var(--mut); font-size: 12.5px; }
+  .kv .v { font-weight: 500; }
+  .kv .v.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 400; }
+  .codes { margin: 12px 18px 0; border-top: 1px solid var(--line-3); padding-top: 12px; display: grid; grid-template-columns: 150px 1fr; row-gap: 10px; }
+  .code-chip { font-family: var(--mono); font-size: 12px; font-weight: 650; background: var(--fill); border: 1px solid #E3E1DB; border-radius: 4px; padding: 1px 6px; margin-right: 4px; }
+  .code-text { font-size: 13px; color: var(--ink-2); margin-top: 5px; line-height: 1.5; }
+  .denial-block { padding: 14px 18px 18px; }
+  .denial-label { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .denial-label b { font-size: 12px; font-weight: 650; color: var(--ink-2); }
+  .phi-badge { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--green-bg); color: var(--green-fg); }
+  .denial-text { background: #FBFAF7; border: 1px solid var(--line-3); border-radius: 6px; padding: 13px 15px; font-family: var(--mono); font-size: 12px; line-height: 1.9; color: var(--ink-2); white-space: pre-wrap; }
+  .phi-tag { font-family: var(--mono); font-size: 10.5px; font-weight: 600; background: #EDF1FB; color: #3D5AA8; border: 1px dashed #B9C6E8; border-radius: 3px; padding: 1px 5px; margin: 0 2px; white-space: nowrap; }
+
+  .appeal-card { display: flex; flex-direction: column; }
+  .meta-strip { padding: 8px 18px; background: #FBFAF7; border-bottom: 1px solid var(--line-3); display: flex; align-items: center; gap: 18px; flex-wrap: wrap; font-size: 11.5px; color: var(--mut); }
+  .meta-strip b { font-family: var(--mono); font-size: 11px; color: var(--ink-2); font-weight: 550; }
+  .fail-banner { margin: 16px 18px; background: var(--red-bg); border: 1px solid #F0CFCA; border-radius: 6px; padding: 13px 15px; }
+  .fail-banner .t { font-size: 13px; font-weight: 650; color: var(--red-fg); }
+  .fail-banner .b { font-size: 12.5px; color: #7A423B; line-height: 1.55; margin-top: 4px; }
+  .letter { flex: 1; width: 100%; min-height: 430px; border: none; outline: none; resize: vertical; padding: 18px 20px; font-family: var(--sans); font-size: 13px; line-height: 1.68; color: #2A2925; background: #FFF; }
+  .refined { margin: 0 18px 14px; border: 1px solid var(--line-3); border-radius: 6px; background: #FBFAF7; padding: 12px 15px; }
+  .refined .t { font-size: 11px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mut); margin-bottom: 6px; }
+  .refined .b { font-size: 12.5px; line-height: 1.6; color: var(--ink-2); white-space: pre-wrap; }
+  .actions { border-top: 1px solid var(--line-3); padding: 11px 16px; display: flex; align-items: center; gap: 8px; }
+
+  /* ---- summary ---- */
+  .sm { flex: 1; min-height: 0; overflow-y: auto; }
+  .sm-inner { max-width: 1060px; margin: 0 auto; padding: 22px 24px 32px; }
+  .sm-head { display: flex; align-items: baseline; gap: 14px; }
+  .sm-title { font-size: 19px; font-weight: 650; letter-spacing: -0.01em; }
+  .sm-meta { font-family: var(--mono); font-size: 12px; color: var(--mut); }
+  .sm-back { border: none; background: none; font-size: 12.5px; font-weight: 550; color: var(--accent); padding: 0; }
+  .sm-back:hover { color: var(--accent-dn); }
+  .sm-cards { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 16px; }
+  .sm-card { background: #FFF; border: 1px solid var(--line-2); border-radius: 12px; box-shadow: var(--card-shadow); padding: 13px 16px; }
+  .sm-num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 24px; font-weight: 600; margin-top: 4px; }
+  .sm-grid { display: grid; grid-template-columns: 7fr 5fr; gap: 12px; margin-top: 12px; align-items: start; }
+  @media (max-width: 900px) { .sm-grid, .sm-cards { grid-template-columns: 1fr; } }
+  .panel { background: #FFF; border: 1px solid var(--line-2); border-radius: 12px; box-shadow: var(--card-shadow); padding: 15px 18px 17px; }
+  .panel-head { display: flex; align-items: baseline; justify-content: space-between; }
+  .panel-title { font-size: 13.5px; font-weight: 650; }
+  .panel-sub { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--mut); }
+  .bars { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
+  .bar-row { display: grid; grid-template-columns: 64px 1fr 84px 34px; align-items: center; gap: 10px; }
+  .bar-row .code { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+  .bar-track { height: 18px; background: var(--fill); border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; background: var(--accent); }
+  .bar-amt { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 550; }
+  .bar-n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--mut-2); }
+  .dl-row { display: grid; grid-template-columns: 88px 1fr 30px; align-items: center; gap: 10px; }
+  .dl-row .pill { justify-content: center; padding: 2px 0; font-size: 11.5px; }
+  .dl-count { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 550; }
+  .sm-note { font-size: 12px; color: var(--mut); margin-top: 12px; line-height: 1.5; }
+  .sm-note b { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; color: var(--red-fg); }
+  .audit-list { display: flex; flex-direction: column; margin-top: 8px; max-height: 300px; overflow-y: auto; }
+  .audit-row { display: flex; align-items: baseline; gap: 10px; padding: 6.5px 0; border-bottom: 1px solid var(--line-row); }
+  .audit-time { flex: none; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--mut-2); }
+  .audit-type { flex: none; font-family: var(--mono); font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 4px; }
+  .audit-detail { font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #23221E; color: #FFF; font-size: 13px; font-weight: 550; padding: 9px 16px; border-radius: 10px; box-shadow: 0 6px 20px rgba(20,19,16,0.25); z-index: 50; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script id="overturn-data" type="application/json">/*__OVERTURN_DATA__*/{}</script>
+<script>
+'use strict';
+// Raw template (marker not yet replaced) falls back to an empty batch.
+const _raw = document.getElementById('overturn-data').textContent.trim();
+const DATA = _raw.startsWith('/*')
+  ? { claims: [], audit: [], summary: { processed: 0, drafts: 0, failed: 0 }, totalBilled: 0 }
+  : JSON.parse(_raw);
+
+const state = {
+  screen: 'worklist', activeId: null,
+  sortCol: 'urgency', sortDir: 'asc',
+  fCarc: [], fPayer: [], fStatus: [], fBucket: [],
+  selected: {}, letters: {}, statusOverride: {}, toast: ''
+};
+
+// ---------- helpers ----------
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt$ = (n) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtD = (iso) => { if (!iso) return '—'; const p = iso.split('-'); return p[1] + '/' + p[2] + '/' + p[0].slice(2); };
+const statusOf = (c) => state.statusOverride[c.id] || c.status;
+const bucketOf = (c) => c.days === null ? 'No deadline' : (c.days < 7 ? '<7 days' : (c.days < 30 ? '7–30 days' : '30+ days'));
+
+const CHECK = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+const LOCK = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#1F6B3D" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>';
+const DOWNLOAD = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
+
+function daysChip(c) {
+  if (c.days === null) return { cls: 'c-gray', label: '—' };
+  if (c.days < 0)  return { cls: 'c-red', label: (-c.days) + 'd overdue' };
+  if (c.days < 7)  return { cls: 'c-red', label: c.days + 'd left' };
+  if (c.days < 30) return { cls: 'c-amber', label: c.days + 'd left' };
+  return { cls: 'c-gray', label: c.days + 'd left' };
+}
+function statusStyle(s) {
+  return {
+    'Draft Ready':  { cls: 'c-blue',  dot: 'var(--blue-dot)' },
+    'Needs Review': { cls: 'c-amber', dot: 'var(--amber-dot)' },
+    'Failed':       { cls: 'c-red',   dot: 'var(--red-dot)' },
+    'Submitted':    { cls: 'c-green', dot: 'var(--green-dot)' }
+  }[s] || { cls: 'c-gray', dot: 'var(--gray-dot)' };
+}
+const statusPill = (s) => { const st = statusStyle(s); return `<span class="st ${st.cls}"><span class="dot" style="background:${st.dot};"></span>${esc(s)}</span>`; };
+const daysPill = (c) => { const d = daysChip(c); return `<span class="pill ${d.cls}">${esc(d.label)}</span>`; };
+
+function phiChips(text) {
+  return String(text ?? '').split(/(\[[A-Z_]+\])/g).map(p =>
+    /^\[[A-Z_]+\]$/.test(p) ? `<span class="phi-tag">${esc(p.slice(1, -1))}</span>` : esc(p)
+  ).join('');
+}
+
+function letterFileFor(c) {
+  const letter = state.letters[c.id] ?? c.letter ?? '';
+  let body = `# Appeal — claim ${c.id} (${c.carc}, ${c.payer})\n\n${letter}\n`;
+  if (c.refined) body += `\n---\n\n## Refined recommendation\n\n${c.refined}\n`;
+  return body;
+}
+function downloadLetter(c) {
+  const blob = new Blob([letterFileFor(c)], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = c.id + '-appeal.md';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  clearTimeout(toastTimer);
+  state.toast = msg;
+  render();
+  toastTimer = setTimeout(() => { state.toast = ''; render(); }, 2600);
+}
+
+function toggleFilter(key, val) {
+  const a = state[key];
+  state[key] = a.includes(val) ? a.filter(x => x !== val) : [...a, val];
+  render();
+}
+function setSort(col) {
+  if (state.sortCol === col) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+  else { state.sortCol = col; state.sortDir = col === 'billed' ? 'desc' : 'asc'; }
+  render();
+}
+
+// ---------- derived ----------
+function visibleSorted() {
+  const s = state;
+  const visible = DATA.claims.filter(c =>
+    (!s.fCarc.length   || s.fCarc.includes(c.carc)) &&
+    (!s.fPayer.length  || s.fPayer.includes(c.payer)) &&
+    (!s.fStatus.length || s.fStatus.includes(statusOf(c))) &&
+    (!s.fBucket.length || s.fBucket.includes(bucketOf(c)))
+  );
+  const dir = s.sortDir === 'asc' ? 1 : -1;
+  const dv = (c) => c.days === null ? Infinity : c.days;
+  return [...visible].sort((a, b) => {
+    switch (s.sortCol) {
+      case 'payer':    return dir * a.payer.localeCompare(b.payer);
+      case 'billed':   return dir * (a.billed - b.billed);
+      case 'denial':   return dir * a.denialDate.localeCompare(b.denialDate);
+      case 'deadline': return dir * String(a.deadline ?? '9999').localeCompare(String(b.deadline ?? '9999'));
+      case 'days':     return dir * (dv(a) - dv(b));
+      default:         return (dv(a) - dv(b)) || (b.billed - a.billed);
+    }
+  });
+}
+
+// ---------- screens ----------
+function renderTopbar() {
+  const on = (sc) => (sc === 'summary') === (state.screen === 'summary') ? 'on' : '';
+  const meta = `worklist ${esc(DATA.generatedOn ?? '—')} · deadlines as of ${esc(DATA.asOf ?? '—')}`;
+  return `
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"></path><polyline points="3 4 3 9 8 9"></polyline></svg></div>
+      <div class="brand-name">Overturn</div>
+    </div>
+    <div class="topbar-rule"></div>
+    <div class="tabs">
+      <button class="tab ${state.screen !== 'summary' ? 'on' : ''}" data-action="go" data-screen="worklist">Worklist</button>
+      <button class="tab ${state.screen === 'summary' ? 'on' : ''}" data-action="go" data-screen="summary">Batch Summary</button>
+    </div>
+    <div class="spacer"></div>
+    <div class="topbar-meta">${meta}</div>
+  </div>`;
+}
+
+function renderWorklist() {
+  const s = state;
+  const all = DATA.claims;
+  const sorted = visibleSorted();
+  const arrow = (col) => s.sortCol === col ? (s.sortDir === 'asc' ? ' ↑' : ' ↓') : '';
+
+  const cnt = (fn) => all.filter(fn).length;
+  const mkGroup = (key, title, vals, countFn) => `
+    <div class="fgroup">
+      <div class="fgroup-title">${esc(title)}</div>
+      ${vals.map(v => `
+        <button class="fitem" data-action="filter" data-key="${key}" data-val="${esc(v)}">
+          <span class="cbox ${s[key].includes(v) ? 'on' : ''}">${CHECK}</span>
+          <span class="fitem-label">${esc(v)}</span>
+          <span class="fitem-count">${countFn(v)}</span>
+        </button>`).join('')}
+    </div>`;
+  const carcs = [...new Set(all.map(c => c.carc))];
+  const payers = [...new Set(all.map(c => c.payer))].sort();
+  const statuses = [...new Set(all.map(c => statusOf(c)))];
+  const buckets = ['<7 days', '7–30 days', '30+ days', 'No deadline'].filter(b => cnt(c => bucketOf(c) === b) > 0);
+  const anyFilters = s.fCarc.length + s.fPayer.length + s.fStatus.length + s.fBucket.length > 0;
+
+  const selIds = Object.keys(s.selected).filter(id => s.selected[id]);
+  const selSum = all.filter(c => selIds.includes(c.id)).reduce((t, c) => t + c.billed, 0);
+  const allChecked = sorted.length > 0 && sorted.every(c => s.selected[c.id]);
+
+  const bLt7 = all.filter(c => c.days !== null && c.days < 7).length;
+  const bMid = all.filter(c => c.days !== null && c.days >= 7 && c.days < 30).length;
+  const bG30 = all.filter(c => c.days !== null && c.days >= 30).length;
+
+  const rows = sorted.map(c => {
+    const checked = !!s.selected[c.id];
+    return `
+    <div class="trow tbody-row ${checked ? 'sel' : ''}" data-action="open" data-id="${esc(c.id)}">
+      <div class="td-check">
+        <button class="cbox ${checked ? 'on' : ''}" style="width:15px;height:15px;" data-action="check" data-id="${esc(c.id)}">${CHECK}</button>
+      </div>
+      <div class="td td-id">${esc(c.id)}</div>
+      <div class="td">${esc(c.payer)}</div>
+      <div class="td td-carc"><span class="code">${esc(c.carc)}</span><span class="why"> · ${esc(c.carcText ?? '')}</span></div>
+      <div class="td td-num">${fmt$(c.billed)}</div>
+      <div class="td td-date">${fmtD(c.denialDate)}</div>
+      <div class="td td-date" style="color:var(--ink-2);">${fmtD(c.deadline)}</div>
+      <div class="td">${daysPill(c)}</div>
+      <div class="td">${statusPill(statusOf(c))}</div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="wl">
+    <div class="rail">
+      <div class="rail-head">
+        <div class="rail-title">Filters</div>
+        ${anyFilters ? '<button class="rail-reset" data-action="reset-filters">Reset</button>' : ''}
+      </div>
+      ${mkGroup('fCarc', 'CARC group', carcs, v => cnt(c => c.carc === v))}
+      ${mkGroup('fPayer', 'Payer', payers, v => cnt(c => c.payer === v))}
+      ${mkGroup('fStatus', 'Status', statuses, v => cnt(c => statusOf(c) === v))}
+      ${mkGroup('fBucket', 'Deadline', buckets, v => cnt(c => bucketOf(c) === v))}
+    </div>
+    <div class="main">
+      <div class="stats">
+        <div><div class="stat-label">Total at stake</div><div class="stat-value">${fmt$(DATA.totalBilled)}</div></div>
+        <div><div class="stat-label">Records</div><div class="stat-value">${all.length} <small>denied claims</small></div></div>
+        <div>
+          <div class="stat-label">Appeal deadlines</div>
+          <div class="stat-pills">
+            <span class="pill c-red">${bLt7} · &lt;7d</span>
+            <span class="pill c-amber">${bMid} · 7–30d</span>
+            <span class="pill c-gray">${bG30} · 30d+</span>
+          </div>
+        </div>
+        <div class="spacer"></div>
+        <div style="text-align:right;">
+          <div class="stat-label">Showing</div>
+          <div class="shown">${sorted.length === all.length ? 'all ' + all.length + ' claims' : sorted.length + ' of ' + all.length + ' claims'}</div>
+        </div>
+      </div>
+      ${selIds.length ? `
+      <div class="bulk">
+        <div class="bulk-label">${selIds.length} claim${selIds.length === 1 ? '' : 's'} selected</div>
+        <div class="bulk-value">${fmt$(selSum)} at stake</div>
+        <div class="spacer"></div>
+        <button class="bulk-clear" data-action="clear-selection">Clear</button>
+        <button class="btn-primary" data-action="export-selected">Export letters</button>
+      </div>` : ''}
+      <div class="table-wrap">
+        <div class="card table-card">
+          <div class="trow thead">
+            <div class="td-check" style="padding-top:9px;padding-bottom:9px;">
+              <button class="cbox ${allChecked ? 'on' : ''}" style="width:15px;height:15px;" data-action="check-all">${CHECK}</button>
+            </div>
+            <div class="th">Claim ID</div>
+            <button class="th" data-action="sort" data-col="payer">Payer${arrow('payer')}</button>
+            <div class="th">CARC · Reason</div>
+            <button class="th num" data-action="sort" data-col="billed">Billed${arrow('billed')}</button>
+            <button class="th" data-action="sort" data-col="denial">Denied${arrow('denial')}</button>
+            <button class="th" data-action="sort" data-col="deadline">Deadline${arrow('deadline')}</button>
+            <button class="th" data-action="sort" data-col="days">Days Left${arrow('days')}</button>
+            <div class="th">Status</div>
+          </div>
+          ${rows}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderDetail() {
+  const c = DATA.claims.find(x => x.id === state.activeId) || DATA.claims[0];
+  if (!c) return '<div class="detail">No claims in this batch.</div>';
+  const st = statusOf(c);
+  const failed = st === 'Failed';
+  const letter = state.letters[c.id] ?? c.letter ?? '';
+  const deadlineHot = c.days !== null && c.days < 7;
+  return `
+  <div class="detail">
+    <button class="backlink" data-action="go" data-screen="worklist">← Worklist</button>
+    <div class="d-head">
+      <div class="d-id">${esc(c.id)}</div>
+      ${statusPill(st)}
+      <div class="d-payer">${esc(c.payer)}</div>
+      ${daysPill(c)}
+      <div class="spacer"></div>
+      <div class="d-billed">${fmt$(c.billed)}</div>
+    </div>
+    <div class="d-grid">
+      <div class="card">
+        <div class="card-head"><div class="card-title">Denial</div><div class="card-sub">parsed from 835 remittance</div></div>
+        <div class="kv">
+          <div class="k">Payer</div><div class="v">${esc(c.payer)}</div>
+          <div class="k">Date of service</div><div class="v mono">${fmtD(c.dos)}</div>
+          <div class="k">Billed</div><div class="v mono">${fmt$(c.billed)}</div>
+          <div class="k">Denial date</div><div class="v mono">${fmtD(c.denialDate)}</div>
+          <div class="k">Appeal deadline</div><div class="v mono" style="font-weight:600;color:${deadlineHot ? 'var(--red-fg)' : 'var(--ink)'};">${fmtD(c.deadline)}</div>
+        </div>
+        <div class="codes">
+          <div class="k" style="color:var(--mut);font-size:12.5px;">CARC</div>
+          <div>
+            <span class="code-chip">${esc(c.carc)}</span>
+            <div class="code-text">${esc(c.carcText ?? 'Code not in the curated CARC database — fallback appeal grounds were used.')}</div>
+          </div>
+          <div class="k" style="color:var(--mut);font-size:12.5px;">RARC</div>
+          <div>${c.rarcs.length ? c.rarcs.map(r => `<span class="code-chip">${esc(r)}</span>`).join('') : '<span style="font-size:12.5px;color:var(--mut-2);">none on remittance</span>'}</div>
+        </div>
+        <div class="denial-block">
+          <div class="denial-label">
+            <b>Original denial text</b>
+            <span class="phi-badge">${LOCK} PHI redacted before model call</span>
+          </div>
+          <div class="denial-text">${phiChips(c.denialText)}</div>
+        </div>
+      </div>
+      <div class="card appeal-card">
+        <div class="card-head"><div class="card-title">Drafted appeal</div><div class="card-sub">editable draft — not sent</div></div>
+        <div class="meta-strip">
+          <div>Model <b>${esc(DATA.model ?? 'refinement skipped (dry run)')}</b></div>
+          ${c.rule ? `<div>Cites <b>${esc(c.rule)}</b></div>` : ''}
+          <div>Generated <b>${esc(DATA.generatedOn ?? '—')}</b></div>
+        </div>
+        ${failed ? `
+        <div class="fail-banner">
+          <div class="t">No appeal drafted</div>
+          <div class="b">${esc(c.error ?? 'This record failed during batch processing.')} Write the appeal manually or re-run the batch for this claim.</div>
+        </div>` : `
+        <textarea class="letter" id="letter-input" spellcheck="false">${esc(letter)}</textarea>
+        ${c.refined ? `<div class="refined"><div class="t">Refined recommendation</div><div class="b">${esc(c.refined)}</div></div>` : ''}`}
+        <div class="actions">
+          ${failed ? '' : `
+          <button class="btn-primary" data-action="approve">Approve</button>
+          <button class="btn" data-action="edit">Edit</button>
+          <button class="btn" data-action="revert">Revert draft</button>`}
+          <div class="spacer"></div>
+          ${failed ? '' : `<button class="btn" data-action="export">${DOWNLOAD} Export letter</button>`}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderSummary() {
+  const all = DATA.claims;
+  const stCount = (s) => all.filter(c => statusOf(c) === s).length;
+  const submitted = stCount('Submitted');
+
+  const carcTotals = {};
+  all.forEach(c => {
+    carcTotals[c.carc] = carcTotals[c.carc] || { amt: 0, n: 0 };
+    carcTotals[c.carc].amt += c.billed; carcTotals[c.carc].n++;
+  });
+  const maxAmt = Math.max(1, ...Object.values(carcTotals).map(t => t.amt));
+  const carcBars = Object.entries(carcTotals).sort((a, b) => b[1].amt - a[1].amt).map(([code, t]) => `
+    <div class="bar-row">
+      <div class="code">${esc(code)}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.max(2, Math.round(t.amt / maxAmt * 100))}%;"></div></div>
+      <div class="bar-amt">${fmt$(t.amt)}</div>
+      <div class="bar-n">×${t.n}</div>
+    </div>`).join('');
+
+  const bucketDefs = [
+    { label: 'Overdue',    cls: 'c-red',   bar: 'var(--red-dot)',   test: (c) => c.days !== null && c.days < 0 },
+    { label: '<7 days',    cls: 'c-red',   bar: 'var(--red-dot)',   test: (c) => c.days !== null && c.days >= 0 && c.days < 7 },
+    { label: '7–30 days',  cls: 'c-amber', bar: 'var(--amber-dot)', test: (c) => c.days !== null && c.days >= 7 && c.days < 30 },
+    { label: '30+ days',   cls: 'c-gray',  bar: 'var(--gray-dot)',  test: (c) => c.days !== null && c.days >= 30 },
+    { label: 'No deadline', cls: 'c-gray', bar: 'var(--gray-dot)',  test: (c) => c.days === null }
+  ].map(b => ({ ...b, count: all.filter(b.test).length }));
+  const maxB = Math.max(1, ...bucketDefs.map(b => b.count));
+  const deadlineBars = bucketDefs.filter(b => b.count > 0 || ['<7 days', '7–30 days', '30+ days'].includes(b.label)).map(b => `
+    <div class="dl-row">
+      <span class="pill ${b.cls}">${esc(b.label)}</span>
+      <div class="bar-track"><div class="bar-fill" style="background:${b.bar};width:${Math.round(b.count / maxB * 100)}%;"></div></div>
+      <div class="dl-count">${b.count}</div>
+    </div>`).join('');
+
+  const hot = all.filter(c => c.days !== null && c.days < 7);
+  const hotSum = hot.reduce((t, c) => t + c.billed, 0);
+
+  const evCls = (t) => ({
+    phi_redacted: 'c-green', appeal_generated: 'c-blue', recommendation_generated: 'c-blue',
+    record_failed: 'c-red', generation_failed: 'c-red',
+    batch_started: 'c-gray', batch_completed: 'c-gray'
+  }[t] || 'c-gray');
+  const audit = DATA.audit.map(e => `
+    <div class="audit-row">
+      <div class="audit-time">${esc(e.time)}</div>
+      <div class="audit-type ${evCls(e.type)}">${esc(e.type)}</div>
+      <div class="audit-detail">${esc(e.detail)}</div>
+    </div>`).join('');
+
+  return `
+  <div class="sm"><div class="sm-inner">
+    <div class="sm-head">
+      <div class="sm-title">Batch summary</div>
+      <div class="sm-meta">worklist ${esc(DATA.generatedOn ?? '—')} · deadlines as of ${esc(DATA.asOf ?? '—')}</div>
+      <div class="spacer"></div>
+      <button class="sm-back" data-action="go" data-screen="worklist">← Back to worklist</button>
+    </div>
+    <div class="sm-cards">
+      <div class="sm-card"><div class="stat-label">Records processed</div><div class="sm-num">${DATA.summary.processed}</div></div>
+      <div class="sm-card"><div class="stat-label">Drafts ready</div><div class="sm-num" style="color:var(--blue-fg);">${DATA.summary.drafts - submitted}</div></div>
+      <div class="sm-card"><div class="stat-label">Approved this session</div><div class="sm-num" style="color:var(--green-fg);">${submitted}</div></div>
+      <div class="sm-card"><div class="stat-label">Failed</div><div class="sm-num" style="color:var(--red-fg);">${DATA.summary.failed}</div></div>
+    </div>
+    <div class="sm-grid">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Dollars at stake by CARC group</div><div class="panel-sub">${fmt$(DATA.totalBilled)} total</div></div>
+        <div class="bars">${carcBars}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="panel">
+          <div class="panel-title">Deadline distribution</div>
+          <div class="bars">${deadlineBars}</div>
+          ${hot.length ? `<div class="sm-note">${hot.length} claim${hot.length === 1 ? '' : 's'} worth <b>${fmt$(hotSum)}</b> expire${hot.length === 1 ? 's' : ''} within 7 days.</div>` : ''}
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Audit trail</div><div class="card-sub">from audit.jsonl · ${DATA.audit.length} events</div></div>
+          <div class="audit-list">${audit || '<div class="sm-note">No audit.jsonl found next to worklist.json.</div>'}</div>
+        </div>
+      </div>
+    </div>
+  </div></div>`;
+}
+
+// ---------- render + events ----------
+function render() {
+  const app = document.getElementById('app');
+  let screen;
+  if (state.screen === 'detail') screen = renderDetail();
+  else if (state.screen === 'summary') screen = renderSummary();
+  else screen = renderWorklist();
+  app.innerHTML = renderTopbar() + screen +
+    (state.toast ? `<div class="toast">${esc(state.toast)}</div>` : '');
+}
+
+document.getElementById('app').addEventListener('click', (ev) => {
+  const el = ev.target.closest('[data-action]');
+  if (!el) return;
+  const action = el.dataset.action;
+  const claim = () => DATA.claims.find(x => x.id === state.activeId) || DATA.claims[0];
+
+  switch (action) {
+    case 'go': state.screen = el.dataset.screen; render(); break;
+    case 'open': state.screen = 'detail'; state.activeId = el.dataset.id; render(); break;
+    case 'check': ev.stopPropagation(); state.selected[el.dataset.id] = !state.selected[el.dataset.id]; render(); break;
+    case 'check-all': {
+      const sorted = visibleSorted();
+      const allChecked = sorted.length > 0 && sorted.every(c => state.selected[c.id]);
+      state.selected = {};
+      if (!allChecked) sorted.forEach(c => { state.selected[c.id] = true; });
+      render(); break;
+    }
+    case 'clear-selection': state.selected = {}; render(); break;
+    case 'export-selected': {
+      const sel = DATA.claims.filter(c => state.selected[c.id] && c.letter);
+      sel.forEach(downloadLetter);
+      showToast(`${sel.length} letter${sel.length === 1 ? '' : 's'} exported`);
+      break;
+    }
+    case 'sort': setSort(el.dataset.col); break;
+    case 'filter': toggleFilter(el.dataset.key, el.dataset.val); break;
+    case 'reset-filters': state.fCarc = []; state.fPayer = []; state.fStatus = []; state.fBucket = []; render(); break;
+    case 'approve': {
+      const c = claim();
+      state.statusOverride[c.id] = 'Submitted';
+      showToast(`${c.id} approved — marked Submitted (this session only)`);
+      break;
+    }
+    case 'edit': { const t = document.getElementById('letter-input'); if (t) t.focus(); break; }
+    case 'revert': {
+      const c = claim();
+      delete state.letters[c.id];
+      showToast('Draft reverted to the generated letter');
+      break;
+    }
+    case 'export': downloadLetter(claim()); showToast(`Exported ${claim().id}-appeal.md`); break;
+  }
+});
+
+document.getElementById('app').addEventListener('input', (ev) => {
+  if (ev.target.id === 'letter-input') {
+    const c = DATA.claims.find(x => x.id === state.activeId) || DATA.claims[0];
+    if (c) state.letters[c.id] = ev.target.value;
+  }
+});
+
+render();
+</script>
+</body>
+</html>
