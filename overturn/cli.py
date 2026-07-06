@@ -5,6 +5,7 @@ Thin adapter — transport, config, and presentation only.
 import json
 import os
 import sys
+import tempfile
 from datetime import date
 from pathlib import Path
 from typing import Optional
@@ -13,8 +14,10 @@ import typer
 from healthflow_agents.tools.remittance_parser import (
     RemittanceParseError,
     load_remittance,
+    make_synthetic_denials,
 )
 from rich.console import Console
+from rich.panel import Panel
 
 from overturn.pipeline import (
     build_agent,
@@ -117,6 +120,86 @@ def run(
             "[dim]dry run: appeal letters are template-generated; "
             "LLM refinement was skipped.[/dim]"
         )
+
+
+DEMO_SEED = 2026
+
+
+@app.command()
+def demo(
+    live: bool = typer.Option(
+        False, "--live",
+        help="Use real Claude refinement (requires ANTHROPIC_API_KEY; "
+        "makes 50 API calls)",
+    ),
+) -> None:
+    """Run the full pipeline on 50 synthetic denials. Zero setup required."""
+    _require_api_key(dry_run=not live)
+    today = date.today()
+
+    console.print(Panel.fit(
+        "[bold]Overturn demo[/bold] — 50 synthetic payer denials "
+        "(seeded generator; every name, claim id, and dollar figure is invented)",
+        border_style="cyan",
+    ))
+
+    records = make_synthetic_denials(50, seed=DEMO_SEED, base_date=today)
+    with tempfile.TemporaryDirectory() as tmp:
+        audit_path = Path(tmp) / "audit.jsonl"
+        agent = build_agent(audit_path, dry_run=not live)
+        result, worklist = run_batch(records, agent=agent, today=today)
+        redaction_events, redaction_count = _redaction_stats(audit_path)
+
+    console.print(build_worklist_table(worklist, today=today))
+
+    summary = result.summary
+    console.print(
+        f"\n[bold]{summary.total_records} records[/bold] — "
+        f"{summary.succeeded} appeals drafted, {summary.failed} failed — "
+        f"[bold]{format_money(summary.total_billed_amount)}[/bold] at stake"
+    )
+    console.print(
+        f"PHI redaction boundary: {redaction_count} identifiers redacted "
+        f"across {redaction_events} records before any text left the process"
+    )
+
+    sample = next(o for o in worklist if o.appeal is not None)
+    console.print(Panel(
+        sample.appeal.appeal_letter,
+        title=(
+            f"Sample appeal letter — {sample.record.claim_id} "
+            f"({sample.record.carc_code}, {sample.record.payer})"
+        ),
+        border_style="green",
+    ))
+    if not live:
+        console.print(
+            "[dim]Letters above are deterministic templates from the appeal "
+            "engine; Claude refinement was skipped (no API key needed). "
+            "Re-run with --live for refined recommendations.[/dim]"
+        )
+    console.print(
+        "[dim]Synthetic data only — Overturn is a demonstration system, "
+        "not production RCM software.[/dim]"
+    )
+
+
+def _redaction_stats(audit_path: Path) -> tuple[int, int]:
+    """(records with redactions, total identifiers redacted) from audit.jsonl."""
+    events = 0
+    total = 0
+    try:
+        lines = audit_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return 0, 0
+    for line in lines:
+        entry = json.loads(line)
+        if entry["event_type"] == "phi_redacted":
+            count = int(entry["details"].get("count", 0))
+            if count:
+                events += 1
+                total += count
+    return events, total
 
 
 if __name__ == "__main__":
