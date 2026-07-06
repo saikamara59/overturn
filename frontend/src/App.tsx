@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TopBar } from './components/TopBar';
 import { DetailScreen } from './components/detail/DetailScreen';
+import { SummaryScreen } from './components/summary/SummaryScreen';
 import { Toast } from './components/ui/Toast';
 import { WorklistScreen } from './components/worklist/WorklistScreen';
 import { downloadLetter, effectiveStatus, visibleSorted } from './lib/worklist';
@@ -92,7 +93,13 @@ export default function App({ data }: { data: WorkbenchData }) {
       );
     }
   } else if (screen === 'summary') {
-    body = <div>summary placeholder</div>; // Task 6
+    body = (
+      <SummaryScreen
+        data={data}
+        statusOverrides={statusOverrides}
+        onBack={() => setScreen('worklist')}
+      />
+    );
   } else {
     body = (
       <WorklistScreen
