@@ -53,8 +53,10 @@ refinement.
 
 ### Sample output
 
-![overturn demo output](docs/demo-screenshot.png)
-<!-- TODO: replace placeholder with a real screen capture of `overturn demo` -->
+The Denial Workbench rendered from a 50-record synthetic batch
+(`overturn run` → `overturn report`):
+
+![Denial Workbench — prioritized worklist](docs/workbench-worklist.png)
 
 ## Commands
 
@@ -77,6 +79,10 @@ letter with export; and a batch-summary view with dollars-at-stake by CARC,
 deadline distribution, and the full audit trail from `audit.jsonl`. Letter
 edits and approvals in the workbench are session-local working state — the
 files on disk are not modified.
+
+![Denial Workbench — claim detail with drafted appeal](docs/workbench-detail.png)
+
+![Denial Workbench — batch summary](docs/workbench-summary.png)
 
 `overturn run` writes to the output directory:
 
