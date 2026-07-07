@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { test, expect } from 'vitest';
+import { afterEach, test, expect, vi } from 'vitest';
 import App from '../App';
 import { SAMPLE_DATA } from '../fixtures/sample';
 
@@ -8,6 +8,11 @@ async function openClaim(id: string) {
   render(<App data={SAMPLE_DATA} />);
   await userEvent.click(screen.getByText(id));
 }
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 test('detail shows denial fields, PHI chips, letter, and approve flow', async () => {
   await openClaim('CLM-0001');
@@ -42,4 +47,30 @@ test('failed claim shows banner and no letter actions', async () => {
   expect(screen.getByText(/synthetic failure/)).toBeInTheDocument();
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+});
+
+test('export triggers a download', async () => {
+  await openClaim('CLM-0001');
+
+  const createObjectURL = vi.fn().mockReturnValue('blob:test');
+  const revokeObjectURL = vi.fn();
+  vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
+  const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+  // Use fake timers + fireEvent (not userEvent) so downloadLetter's deferred
+  // revokeObjectURL setTimeout never escapes as a pending real-clock timer.
+  vi.useFakeTimers();
+  fireEvent.click(screen.getByRole('button', { name: 'Export letter' }));
+
+  expect(createObjectURL).toHaveBeenCalledTimes(1);
+  expect(createObjectURL.mock.calls[0][0]).toBeInstanceOf(Blob);
+  expect(clickSpy).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('status')).toHaveTextContent('Exported CLM-0001-appeal.md');
+
+  act(() => {
+    vi.advanceTimersByTime(5000);
+  });
+  expect(revokeObjectURL).toHaveBeenCalledWith('blob:test');
+
+  clickSpy.mockRestore();
 });
