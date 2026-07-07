@@ -97,3 +97,21 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]"
 
 Tests stub the one LLM call through the package's supported `client=`
 injection point; no network access or API key is required.
+
+### Frontend (Denial Workbench)
+
+The HTML workbench template is built from a React + TypeScript app in
+`frontend/`. The built single-file template is committed at
+`overturn/templates/workbench.html`, so Python users never need Node.
+
+To change the workbench UI:
+
+```bash
+cd frontend
+npm install
+npm run dev             # hot-reload dev server with a synthetic fixture
+npm test                # Vitest + React Testing Library
+npm run build:template  # build and install overturn/templates/workbench.html
+```
+
+Commit the rebuilt template together with the frontend source change.

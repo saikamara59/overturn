@@ -4,3 +4,5 @@ __pycache__/
 .pytest_cache/
 results/
 dist/
+node_modules/
+frontend/dist/
