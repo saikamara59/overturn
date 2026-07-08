@@ -1,17 +1,25 @@
 """FastAPI app factory. Production entry: `uvicorn server.app:app`."""
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.staticfiles import StaticFiles
 
-from server.api import auth, claims, runs
+from server.api import auth, claims, demo, runs
 from server.config import Settings, get_settings
 from server.db import make_engine, make_session_factory
 
 
 def create_app(settings: Settings, session_factory) -> FastAPI:
-    app = FastAPI(title="Overturn", version="0.1.0")
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        if settings.demo_mode:
+            from server.demo import seed_demo
+            seed_demo(session_factory)
+        yield
+
+    app = FastAPI(title="Overturn", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.session_factory = session_factory
     app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
@@ -20,6 +28,7 @@ def create_app(settings: Settings, session_factory) -> FastAPI:
     api.include_router(auth.router)
     api.include_router(runs.router)
     api.include_router(claims.router)
+    api.include_router(demo.router)
     app.include_router(api)
 
     spa_dir = Path(settings.spa_dir) if settings.spa_dir else (
