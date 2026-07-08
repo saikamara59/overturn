@@ -7,11 +7,21 @@ import { WorklistScreen } from './components/worklist/WorklistScreen';
 import { downloadLetter, effectiveStatus, visibleSorted } from './lib/worklist';
 import {
   NO_FILTERS,
+  type Claim,
   type FilterKey, type FilterState, type Screen, type SortCol,
   type SortState, type StatusOverrides, type WorkbenchData,
 } from './types';
 
-export default function App({ data }: { data: WorkbenchData }) {
+export interface WorkbenchMutations {
+  approve(c: Claim): Promise<void>;
+  saveLetter(c: Claim, text: string): Promise<void>;
+  revertLetter(c: Claim): Promise<string>;
+}
+
+export default function App({
+  data,
+  mutations,
+}: { data: WorkbenchData; mutations?: WorkbenchMutations }) {
   const [screen, setScreen] = useState<Screen>('worklist');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [sort, setSort] = useState<SortState>({ col: 'urgency', dir: 'asc' });
@@ -21,6 +31,7 @@ export default function App({ data }: { data: WorkbenchData }) {
   const [statusOverrides, setStatusOverrides] = useState<StatusOverrides>({});
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const showToast = useCallback((msg: string) => {
     clearTimeout(toastTimer.current);
@@ -28,6 +39,7 @@ export default function App({ data }: { data: WorkbenchData }) {
     toastTimer.current = setTimeout(() => setToast(''), 2600);
   }, []);
   useEffect(() => () => clearTimeout(toastTimer.current), []);
+  useEffect(() => () => clearTimeout(saveTimer.current), []);
 
   const sorted = useMemo(
     () => visibleSorted(data.claims, filters, sort, statusOverrides),
@@ -72,18 +84,45 @@ export default function App({ data }: { data: WorkbenchData }) {
           generatedOn={data.generatedOn}
           letter={letters[claim.id] ?? claim.letter ?? ''}
           onBack={() => setScreen('worklist')}
-          onLetterChange={(text) => setLetters((l) => ({ ...l, [claim.id]: text }))}
+          onLetterChange={(text) => {
+            setLetters((l) => ({ ...l, [claim.id]: text }));
+            if (mutations) {
+              clearTimeout(saveTimer.current);
+              saveTimer.current = setTimeout(() => {
+                mutations.saveLetter(claim, text).catch((e) => showToast(String(e.message ?? e)));
+              }, 800);
+            }
+          }}
           onApprove={() => {
-            setStatusOverrides((o) => ({ ...o, [claim.id]: 'Submitted' }));
-            showToast(`${claim.id} approved — marked Submitted (this session only)`);
+            const apply = () => {
+              setStatusOverrides((o) => ({ ...o, [claim.id]: 'Submitted' }));
+              showToast(
+                mutations
+                  ? `${claim.id} approved — saved`
+                  : `${claim.id} approved — marked Submitted (this session only)`,
+              );
+            };
+            if (mutations) {
+              mutations.approve(claim).then(apply).catch((e) => showToast(String(e.message ?? e)));
+            } else {
+              apply();
+            }
           }}
           onRevert={() => {
-            setLetters((l) => {
-              const next = { ...l };
-              delete next[claim.id];
-              return next;
-            });
-            showToast('Draft reverted to the generated letter');
+            const applyLocal = (restored?: string) => {
+              setLetters((l) => {
+                const next = { ...l };
+                if (restored !== undefined) next[claim.id] = restored;
+                else delete next[claim.id];
+                return next;
+              });
+              showToast('Draft reverted to the generated letter');
+            };
+            if (mutations) {
+              mutations.revertLetter(claim).then(applyLocal).catch((e) => showToast(String(e.message ?? e)));
+            } else {
+              applyLocal();
+            }
           }}
           onExport={() => {
             downloadLetter(claim, letters[claim.id]);
