@@ -1,7 +1,10 @@
+import io
 import uuid
+import zipfile
+from datetime import date
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from healthflow_agents.tools.remittance_parser import (
     RemittanceParseError,
     parse_remittance_csv,
@@ -11,8 +14,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from server.api.deps import get_session
-from server.models import Claim, Run
-from server.payloads import run_payload
+from server.models import AuditEvent, Claim, Run
+from server.payloads import audit_entries, letter_markdown, run_payload, worklist_payload
 from server.security import require_user
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -120,3 +123,58 @@ def retry_run(
         run.error = None
         run.finished_at = None
     return {"requeued": requeued}
+
+
+def _ordered_claims(session: Session, run_id: uuid.UUID) -> list[Claim]:
+    return list(session.scalars(
+        select(Claim)
+        .where(Claim.run_id == run_id)
+        .order_by(Claim.appeal_deadline.asc().nulls_last(), Claim.billed_amount.desc())
+    ))
+
+
+@router.get("/{run_id}/claims")
+def run_claims(
+    run_id: uuid.UUID,
+    session: Session = Depends(get_session),
+    _user: str = Depends(require_user),
+) -> dict:
+    run = get_run_or_404(session, run_id)
+    model = session.scalars(
+        select(AuditEvent.model)
+        .where(AuditEvent.run_id == run_id, AuditEvent.model.is_not(None))
+        .limit(1)
+    ).first()
+    return worklist_payload(run, _ordered_claims(session, run_id), model, date.today())
+
+
+@router.get("/{run_id}/audit")
+def run_audit(
+    run_id: uuid.UUID,
+    session: Session = Depends(get_session),
+    _user: str = Depends(require_user),
+) -> list[dict]:
+    get_run_or_404(session, run_id)
+    events = session.scalars(
+        select(AuditEvent).where(AuditEvent.run_id == run_id).order_by(AuditEvent.id)
+    ).all()
+    return audit_entries(list(events))
+
+
+@router.get("/{run_id}/letters.zip")
+def run_letters_zip(
+    run_id: uuid.UUID,
+    session: Session = Depends(get_session),
+    _user: str = Depends(require_user),
+) -> Response:
+    get_run_or_404(session, run_id)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for claim in _ordered_claims(session, run_id):
+            if claim.letter:
+                z.writestr(f"{claim.claim_id}-appeal.md", letter_markdown(claim))
+    return Response(
+        buf.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="letters.zip"'},
+    )
