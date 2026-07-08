@@ -34,3 +34,36 @@ def session_factory(engine):
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine, expire_on_commit=False)
+
+
+@pytest.fixture()
+def settings():
+    from server.config import Settings
+
+    return Settings(
+        database_url=TEST_DATABASE_URL,
+        admin_email="admin@example.com",
+        admin_password="hunter2hunter2",
+        secret_key="test-secret",
+        anthropic_api_key=None,
+        demo_mode=False,
+    )
+
+
+@pytest.fixture()
+def client(settings, session_factory):
+    from fastapi.testclient import TestClient
+
+    from server.app import create_app
+
+    app = create_app(settings=settings, session_factory=session_factory)
+    with TestClient(app) as c:
+        yield c
+
+
+def login(client):
+    r = client.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@example.com", "password": "hunter2hunter2"},
+    )
+    assert r.status_code == 200, r.text
