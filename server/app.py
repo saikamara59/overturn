@@ -6,7 +6,7 @@ from fastapi import APIRouter, FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.staticfiles import StaticFiles
 
-from server.api import auth, claims, demo, runs
+from server.api import auth, claims, demo, org, runs
 from server.config import Settings, get_settings
 from server.db import make_engine, make_session_factory
 
@@ -24,12 +24,15 @@ def create_app(settings: Settings, session_factory) -> FastAPI:
     app = FastAPI(title="Overturn", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.session_factory = session_factory
+    from server.crypto import KeyVault
+    app.state.key_vault = KeyVault(settings.key_encryption_secret)
     app.add_middleware(
         SessionMiddleware, secret_key=settings.secret_key, https_only=settings.secure_cookies
     )
 
     api = APIRouter(prefix="/api/v1")
     api.include_router(auth.router)
+    api.include_router(org.router)
     api.include_router(runs.router)
     api.include_router(claims.router)
     api.include_router(demo.router)
