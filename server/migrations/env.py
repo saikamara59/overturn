@@ -3,6 +3,7 @@ import os
 from alembic import context
 from sqlalchemy import create_engine
 
+from server.db import normalize_database_url
 from server.models import Base
 
 config = context.config
@@ -10,7 +11,7 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    return os.environ["DATABASE_URL"]
+    return normalize_database_url(os.environ["DATABASE_URL"])
 
 
 def run_migrations_offline() -> None:
