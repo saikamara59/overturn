@@ -47,6 +47,43 @@ def test_claim_defaults_and_cascade_delete(session_factory):
         assert s.query(Claim).count() == 0
 
 
+def test_org_user_membership_invite_roundtrip(session_factory):
+    import uuid
+    from datetime import timedelta
+
+    from server.models import Invite, Membership, Org, User
+
+    with session_factory() as s:
+        org = Org(name="Acme RCM")
+        user = User(email="a@b.c", password_hash="h")
+        s.add_all([org, user])
+        s.flush()
+        s.add(Membership(user_id=user.id, org_id=org.id, role="admin"))
+        s.add(Invite(
+            token="tok123", org_id=org.id, role="member",
+            created_by=user.id, expires_at=utcnow() + timedelta(days=7),
+        ))
+        s.commit()
+        assert org.status == "active"
+        assert org.anthropic_key_encrypted is None
+        assert user.is_platform_admin is False
+        inv = s.query(Invite).one()
+        assert inv.used_at is None and inv.used_by is None
+
+
+def test_run_carries_org_id(session_factory):
+    from server.models import Org
+
+    with session_factory() as s:
+        org = Org(name="O2")
+        s.add(org)
+        s.flush()
+        run = make_run(org_id=org.id)
+        s.add(run)
+        s.commit()
+        assert s.query(Run).one().org_id == org.id
+
+
 def test_audit_event_jsonb_details(session_factory):
     with session_factory() as s:
         run = make_run()

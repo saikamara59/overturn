@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     admin_email: str
     admin_password: str
     secret_key: str
+    key_encryption_secret: str
     max_upload_records: int = 200
     demo_mode: bool = True
     spa_dir: str | None = None

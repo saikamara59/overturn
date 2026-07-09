@@ -2,6 +2,7 @@
 import os
 
 import pytest
+from cryptography.fernet import Fernet
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
@@ -47,6 +48,7 @@ def settings():
         secret_key="test-secret",
         anthropic_api_key=None,
         demo_mode=False,
+        key_encryption_secret=Fernet.generate_key().decode(),
     )
 
 
