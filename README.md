@@ -153,5 +153,7 @@ from this repo's Dockerfile — **web** (default CMD) and **worker**
 (override start command to `python -m server.worker`). Set on both:
 `DATABASE_URL` (from the plugin), `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
 `SECRET_KEY`, `ANTHROPIC_API_KEY` (optional — dry runs work without it),
-`MAX_UPLOAD_RECORDS` (default 200), `DEMO_MODE` (default 1). Migrations run
-automatically when the web service starts.
+`MAX_UPLOAD_RECORDS` (default 200), `DEMO_MODE` (default 1), `SECURE_COOKIES`
+(default 0 — recommend setting to 1 in production so session cookies are
+sent `https_only`). Migrations run automatically when the web service
+starts.

@@ -33,6 +33,9 @@ def test_worklist_payload_shape(client, session_factory):
                 "letter", "refined", "rule", "error"):
         assert key in entry, key
     assert entry["status"] == "Draft Ready"
+    assert isinstance(data["audit"], list) and len(data["audit"]) > 0
+    for e in data["audit"]:
+        assert set(e) == {"time", "type", "detail"}
 
 
 def test_audit_endpoint_maps_events(client, session_factory):

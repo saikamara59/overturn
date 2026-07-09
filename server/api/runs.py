@@ -122,6 +122,8 @@ def retry_run(
         run.status = "queued"
         run.error = None
         run.finished_at = None
+    run.drafted = sum(1 for c in run.claims if c.status in ("draft_ready", "submitted"))
+    run.failed_records = sum(1 for c in run.claims if c.status == "failed")
     return {"requeued": requeued}
 
 
@@ -143,9 +145,15 @@ def run_claims(
     model = session.scalars(
         select(AuditEvent.model)
         .where(AuditEvent.run_id == run_id, AuditEvent.model.is_not(None))
+        .order_by(AuditEvent.id)
         .limit(1)
     ).first()
-    return worklist_payload(run, _ordered_claims(session, run_id), model, date.today())
+    events = session.scalars(
+        select(AuditEvent).where(AuditEvent.run_id == run_id).order_by(AuditEvent.id)
+    ).all()
+    return worklist_payload(
+        run, _ordered_claims(session, run_id), model, date.today(), audit_entries(list(events))
+    )
 
 
 @router.get("/{run_id}/audit")

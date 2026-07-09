@@ -1,4 +1,3 @@
-import uuid
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -23,7 +22,12 @@ def _demo_run(session: Session) -> Run:
 @router.get("/claims")
 def demo_claims(session: Session = Depends(get_session)) -> dict:
     run = _demo_run(session)
-    return worklist_payload(run, _ordered_claims(session, run.id), None, date.today())
+    events = session.scalars(
+        select(AuditEvent).where(AuditEvent.run_id == run.id).order_by(AuditEvent.id)
+    ).all()
+    return worklist_payload(
+        run, _ordered_claims(session, run.id), None, date.today(), audit_entries(list(events))
+    )
 
 
 @router.get("/audit")

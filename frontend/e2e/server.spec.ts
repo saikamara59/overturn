@@ -26,6 +26,9 @@ test('upload → draft → approve → persists across reload', async ({ page })
   await page.getByRole('button', { name: 'Approve' }).click();
   await expect(page.getByText('Submitted').first()).toBeVisible();
 
+  await page.getByRole('button', { name: 'Batch Summary' }).click();
+  await expect(page.getByText('Audit trail')).toBeVisible();
+
   await page.reload();
   await page.getByText('CLM-E2E-1').click();
   await expect(page.getByText('Submitted').first()).toBeVisible();

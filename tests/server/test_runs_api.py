@@ -83,6 +83,8 @@ def test_retry_requeues_unfinished_claims(client, session_factory):
         claims[2].status = "drafting"
         run = s.query(Run).one()
         run.status = "failed"
+        run.drafted = 1
+        run.failed_records = 1
         s.commit()
     r = client.post(f"/api/v1/runs/{run_id}/retry")
     assert r.status_code == 200 and r.json() == {"requeued": 2}
@@ -90,4 +92,7 @@ def test_retry_requeues_unfinished_claims(client, session_factory):
         statuses = {c.claim_id: c.status for c in s.query(Claim).all()}
         assert statuses["CLM-001"] == "draft_ready"
         assert statuses["CLM-002"] == "queued" and statuses["CLM-003"] == "queued"
-        assert s.query(Run).one().status == "queued"
+        run = s.query(Run).one()
+        assert run.status == "queued"
+        assert run.drafted == 1
+        assert run.failed_records == 0

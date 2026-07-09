@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     max_upload_records: int = 200
     demo_mode: bool = True
     spa_dir: str | None = None
+    secure_cookies: bool = False
 
 
 @lru_cache

@@ -1,6 +1,6 @@
 """JSON payload builders. camelCase keys; claim entries reuse the static
 report's island shape (see Task 6) so workbench components work unchanged."""
-from datetime import date, datetime
+from datetime import date
 
 from server.models import AuditEvent, Claim, Run
 
@@ -60,7 +60,7 @@ def claim_entry(claim: Claim, today: date) -> dict:
 
 
 def worklist_payload(
-    run: Run, claims: list[Claim], model: str | None, today: date
+    run: Run, claims: list[Claim], model: str | None, today: date, audit: list[dict]
 ) -> dict:
     return {
         "generatedOn": run.created_at.date().isoformat(),
@@ -73,6 +73,7 @@ def worklist_payload(
             "drafts": run.drafted,
             "failed": run.failed_records,
         },
+        "audit": audit,
     }
 
 

@@ -22,7 +22,9 @@ def create_app(settings: Settings, session_factory) -> FastAPI:
     app = FastAPI(title="Overturn", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.session_factory = session_factory
-    app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
+    app.add_middleware(
+        SessionMiddleware, secret_key=settings.secret_key, https_only=settings.secure_cookies
+    )
 
     api = APIRouter(prefix="/api/v1")
     api.include_router(auth.router)

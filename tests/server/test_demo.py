@@ -20,6 +20,7 @@ def test_demo_endpoints_are_public_and_read_only(client, session_factory):
     assert len(data["claims"]) == 50
     audit = client.get("/api/v1/demo/audit").json()
     assert len(audit) > 0
+    assert isinstance(data["audit"], list) and len(data["audit"]) > 0
 
     # write endpoints refuse the demo run even when authenticated
     from tests.server.conftest import login
