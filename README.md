@@ -121,3 +121,37 @@ npm run build:template  # build and install overturn/templates/workbench.html
 ```
 
 Commit the rebuilt template together with the frontend source change.
+
+### Server (Denial Workbench as a web app)
+
+Phase 1 single-tenant server: upload a remittance in the browser, appeals
+draft in the background, and the workbench persists approvals and letter
+edits. Synthetic data only — do not upload real PHI; this is a demonstration
+system and deployments are not BAA-covered.
+
+Local stack (API + worker + Postgres):
+
+```bash
+docker compose up --build
+# open http://localhost:8000 — read-only demo; sign in with ADMIN_EMAIL/ADMIN_PASSWORD
+```
+
+Development without Docker:
+
+```bash
+docker compose up -d db
+.venv/bin/pip install -e ".[dev,server]"
+DATABASE_URL=postgresql+psycopg://overturn:overturn@localhost:5433/overturn \
+  ADMIN_EMAIL=a@b.c ADMIN_PASSWORD=pw SECRET_KEY=dev \
+  .venv/bin/uvicorn server.app:app --reload &
+DATABASE_URL=... .venv/bin/python -m server.worker &
+cd frontend && npm run dev:app   # Vite dev server proxying /api
+```
+
+Deploy (Railway): create a project with a Postgres plugin and two services
+from this repo's Dockerfile — **web** (default CMD) and **worker**
+(override start command to `python -m server.worker`). Set on both:
+`DATABASE_URL` (from the plugin), `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
+`SECRET_KEY`, `ANTHROPIC_API_KEY` (optional — dry runs work without it),
+`MAX_UPLOAD_RECORDS` (default 200), `DEMO_MODE` (default 1). Migrations run
+automatically when the web service starts.
