@@ -8,6 +8,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:template": "npm run build && node scripts/install-template.mjs",
+    "dev:app": "vite --config vite.app.config.ts",
+    "build:app": "tsc --noEmit && vite build --config vite.app.config.ts && node scripts/finalize-app.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

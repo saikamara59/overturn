@@ -6,3 +6,5 @@ results/
 dist/
 node_modules/
 frontend/dist/
+frontend/dist-app/
+frontend/.vite/
