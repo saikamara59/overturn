@@ -21,4 +21,6 @@ COPY alembic.ini ./
 COPY --from=frontend /build/dist-app ./frontend/dist-app
 ENV SPA_DIR=/app/frontend/dist-app
 EXPOSE 8000
-CMD ["sh", "-c", "python -m alembic upgrade head && python -m uvicorn server.app:app --host 0.0.0.0 --port 8000"]
+# One image, two roles: SERVICE_ROLE=worker runs the queue loop; anything
+# else migrates then serves the API on $PORT (Railway injects PORT).
+CMD ["sh", "-c", "if [ \"$SERVICE_ROLE\" = \"worker\" ]; then exec python -m server.worker; else python -m alembic upgrade head && exec python -m uvicorn server.app:app --host 0.0.0.0 --port ${PORT:-8000}; fi"]

@@ -149,8 +149,8 @@ cd frontend && npm run dev:app   # Vite dev server proxying /api
 ```
 
 Deploy (Railway): create a project with a Postgres plugin and two services
-from this repo's Dockerfile — **web** (default CMD) and **worker**
-(override start command to `python -m server.worker`). Set on both:
+from this repo's Dockerfile — **web** (default) and **worker** (set
+`SERVICE_ROLE=worker`; the image's CMD dispatches on it). Set on both:
 `DATABASE_URL` (from the plugin), `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
 `SECRET_KEY`, `ANTHROPIC_API_KEY` (optional — dry runs work without it),
 `MAX_UPLOAD_RECORDS` (default 200), `DEMO_MODE` (default 1), `SECURE_COOKIES`
