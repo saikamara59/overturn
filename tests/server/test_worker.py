@@ -10,7 +10,11 @@ from server.worker import claim_next_run, process_run, run_worker_loop
 
 
 def seed_run(session_factory, n=3, **run_over):
+    from tests.server.conftest import make_org
+
     records = make_synthetic_denials(n, seed=7, base_date=date(2026, 7, 8))
+    org = make_org(session_factory, name=f"WorkerOrg-{n}-{len(run_over)}")
+    run_over.setdefault("org_id", org.id)
     with session_factory() as s:
         run = Run(filename="r.csv", dry_run=True, total_records=n,
                   total_billed=round(sum(r.billed_amount for r in records), 2),

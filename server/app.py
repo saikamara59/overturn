@@ -2,12 +2,11 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, FastAPI
+from fastapi import APIRouter, FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.staticfiles import StaticFiles
 
 from server.api import auth, claims, demo, runs
-from server.api.deps import current_org
 from server.config import Settings, get_settings
 from server.db import make_engine, make_session_factory
 
@@ -31,12 +30,8 @@ def create_app(settings: Settings, session_factory) -> FastAPI:
 
     api = APIRouter(prefix="/api/v1")
     api.include_router(auth.router)
-    # Task 3 moves org-scoping into the routers themselves; for now, gate
-    # tenant-owned resources at inclusion time so disabled/missing orgs are
-    # rejected without touching runs.py/claims.py (still on the Phase 1
-    # `require_user` shim — see server/security.py).
-    api.include_router(runs.router, dependencies=[Depends(current_org)])
-    api.include_router(claims.router, dependencies=[Depends(current_org)])
+    api.include_router(runs.router)
+    api.include_router(claims.router)
     api.include_router(demo.router)
     app.include_router(api)
 

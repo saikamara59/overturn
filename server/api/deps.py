@@ -69,3 +69,29 @@ def require_platform_admin(user: User = Depends(current_user)) -> User:
     if not user.is_platform_admin:
         raise HTTPException(status_code=403, detail="platform admin required")
     return user
+
+
+def scoped_run(
+    run_id: uuid.UUID,
+    ctx: OrgContext = Depends(current_org),
+    session: Session = Depends(get_session),
+):
+    from server.models import Run
+
+    run = session.get(Run, run_id)
+    if run is None or run.org_id != ctx.org.id:
+        raise HTTPException(status_code=404, detail="run not found")
+    return run
+
+
+def scoped_claim(
+    claim_id: uuid.UUID,
+    ctx: OrgContext = Depends(current_org),
+    session: Session = Depends(get_session),
+):
+    from server.models import Claim
+
+    claim = session.get(Claim, claim_id)
+    if claim is None or claim.run.org_id != ctx.org.id:
+        raise HTTPException(status_code=404, detail="claim not found")
+    return claim

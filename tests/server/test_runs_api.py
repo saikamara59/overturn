@@ -59,7 +59,7 @@ def test_live_upload_without_api_key_422(client):
     login(client)
     r = upload(client, dry_run=False)
     assert r.status_code == 422
-    assert "ANTHROPIC_API_KEY" in r.json()["detail"]
+    assert "API key" in r.json()["detail"]
 
 
 def test_list_and_get_runs(client):

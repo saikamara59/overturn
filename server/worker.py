@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from overturn.dryrun import DryRunClient
-from server.models import Claim, Run, utcnow
+from server.models import Claim, Org, Run, utcnow
 from server.sinks import DbAuditSink, DbInvocationTracker
 
 POLL_INTERVAL_SECONDS = 2.0
@@ -29,10 +29,12 @@ POLL_INTERVAL_SECONDS = 2.0
 def claim_next_run(session: Session) -> uuid.UUID | None:
     run = session.execute(
         select(Run)
-        .where(Run.status == "queued", Run.is_demo.is_(False))
+        .join(Org, Org.id == Run.org_id)
+        .where(Run.status == "queued", Run.is_demo.is_(False),
+               Org.status == "active")
         .order_by(Run.created_at)
         .limit(1)
-        .with_for_update(skip_locked=True)
+        .with_for_update(skip_locked=True, of=Run)
     ).scalar_one_or_none()
     if run is None:
         return None
