@@ -8,3 +8,5 @@ node_modules/
 frontend/dist/
 frontend/dist-app/
 frontend/.vite/
+frontend/test-results/
+frontend/playwright-report/
