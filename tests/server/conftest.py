@@ -69,3 +69,36 @@ def login(client):
         json={"email": "admin@example.com", "password": "hunter2hunter2"},
     )
     assert r.status_code == 200, r.text
+
+
+def make_org(session_factory, name="Acme RCM", **over):
+    from server.models import Org
+
+    with session_factory() as s:
+        org = Org(name=name, **over)
+        s.add(org)
+        s.commit()
+        return org
+
+
+def make_user(session_factory, email, password, org=None, role="member",
+              platform_admin=False):
+    from server.crypto import hash_password
+    from server.models import Membership, User
+
+    with session_factory() as s:
+        user = User(email=email.lower(), password_hash=hash_password(password),
+                    is_platform_admin=platform_admin)
+        s.add(user)
+        s.flush()
+        if org is not None:
+            s.add(Membership(user_id=user.id, org_id=org.id, role=role))
+        s.commit()
+        return user
+
+
+def login_as(client, email, password):
+    r = client.post("/api/v1/auth/login",
+                    json={"email": email, "password": password})
+    assert r.status_code == 200, r.text
+    return r.json()
