@@ -1,0 +1,11 @@
+.venv
+.git
+frontend/node_modules
+frontend/dist
+frontend/dist-app
+tests
+docs
+.superpowers
+.pytest_cache
+__pycache__
+results

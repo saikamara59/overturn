@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: overturn
+      POSTGRES_PASSWORD: overturn
+      POSTGRES_DB: overturn
+    ports:
+      - "5433:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./docker/db-init.sql:/docker-entrypoint-initdb.d/db-init.sql
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment: &appenv
+      DATABASE_URL: postgresql+psycopg://overturn:overturn@db:5432/overturn
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: change-me-locally
+      SECRET_KEY: dev-secret-not-for-prod
+      DEMO_MODE: "1"
+      # ANTHROPIC_API_KEY: set in your shell to enable live runs
+    depends_on:
+      - db
+  worker:
+    build: .
+    command: python -m server.worker
+    environment: *appenv
+    depends_on:
+      - db
+volumes:
+  db-data:

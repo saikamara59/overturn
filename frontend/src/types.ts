@@ -15,6 +15,8 @@ export interface Claim {
   refined: string | null;
   rule: string | null;
   error: string | null;
+  /** Server row id for mutations; absent in static-report (island) mode. */
+  dbId?: string;
 }
 
 export interface AuditEvent {
