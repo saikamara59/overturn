@@ -6,7 +6,7 @@ from fastapi import APIRouter, FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.staticfiles import StaticFiles
 
-from server.api import auth, claims, demo, org, runs
+from server.api import auth, claims, demo, invites, org, runs
 from server.config import Settings, get_settings
 from server.db import make_engine, make_session_factory
 
@@ -36,6 +36,8 @@ def create_app(settings: Settings, session_factory) -> FastAPI:
     api.include_router(runs.router)
     api.include_router(claims.router)
     api.include_router(demo.router)
+    api.include_router(invites.org_router)
+    api.include_router(invites.public_router)
     app.include_router(api)
 
     spa_dir = Path(settings.spa_dir) if settings.spa_dir else (
