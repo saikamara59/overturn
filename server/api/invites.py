@@ -92,6 +92,9 @@ def _live_invite(session: Session, token: str) -> Invite:
         raise HTTPException(404, detail="invite not found")
     if inv.used_at is not None or inv.expires_at <= utcnow():
         raise HTTPException(410, detail="invite expired or already used")
+    org = session.get(Org, inv.org_id)
+    if org is None or org.status == "disabled":
+        raise HTTPException(410, detail="this organization is disabled")
     return inv
 
 

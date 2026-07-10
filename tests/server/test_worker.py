@@ -15,8 +15,9 @@ def seed_run(session_factory, n=3, **run_over):
     records = make_synthetic_denials(n, seed=7, base_date=date(2026, 7, 8))
     org = make_org(session_factory, name=f"WorkerOrg-{n}-{len(run_over)}")
     run_over.setdefault("org_id", org.id)
+    run_over.setdefault("dry_run", True)
     with session_factory() as s:
-        run = Run(filename="r.csv", dry_run=True, total_records=n,
+        run = Run(filename="r.csv", total_records=n,
                   total_billed=round(sum(r.billed_amount for r in records), 2),
                   **run_over)
         s.add(run)
@@ -126,3 +127,61 @@ def test_worker_loop_processes_queued_run(session_factory):
     )
     with session_factory() as s:
         assert s.get(Run, run_id).status == "completed"
+
+
+def test_live_run_uses_decrypted_org_key(session_factory, settings, monkeypatch):
+    import server.worker as worker_mod
+    from server.crypto import KeyVault, last4
+    from server.models import Org
+
+    vault = KeyVault(settings.key_encryption_secret)
+    run_id = seed_run(session_factory, n=1, dry_run=False)
+    with session_factory() as s:
+        run = s.get(Run, run_id)
+        org = s.get(Org, run.org_id)
+        org.anthropic_key_encrypted = vault.encrypt("sk-ant-orgkey000011112222")
+        org.anthropic_key_last4 = last4("sk-ant-orgkey000011112222")
+        s.commit()
+
+    captured = {}
+
+    class FakeAnthropic:
+        def __init__(self, api_key=None, **kwargs):
+            captured["api_key"] = api_key
+            from overturn.dryrun import DryRunClient
+            self.messages = DryRunClient().messages
+
+    monkeypatch.setattr(worker_mod.anthropic, "Anthropic", FakeAnthropic)
+    with session_factory() as s:
+        claim_next_run(s)
+    process_run(run_id, session_factory=session_factory, key_vault=vault)
+    assert captured["api_key"] == "sk-ant-orgkey000011112222"
+    with session_factory() as s:
+        assert s.get(Run, run_id).status == "completed"
+
+
+def test_live_run_without_org_key_fails_cleanly(session_factory, settings):
+    from server.crypto import KeyVault
+
+    run_id = seed_run(session_factory, n=1, dry_run=False)
+    with session_factory() as s:
+        claim_next_run(s)
+    process_run(run_id, session_factory=session_factory,
+                key_vault=KeyVault(settings.key_encryption_secret))
+    with session_factory() as s:
+        run = s.get(Run, run_id)
+        assert run.status == "failed"
+        assert "API key" in run.error
+        # claims untouched — retryable after a key is added
+        assert all(c.status == "queued" for c in s.query(Claim).all())
+
+
+def test_worker_skips_disabled_org_runs(session_factory):
+    run_id = seed_run(session_factory)
+    from server.models import Org
+    with session_factory() as s:
+        run = s.get(Run, run_id)
+        s.get(Org, run.org_id).status = "disabled"
+        s.commit()
+    with session_factory() as s:
+        assert claim_next_run(s) is None
