@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { login } from './api';
+import { login, type MeInfo } from './api';
 
-export function LoginScreen({ onLoggedIn }: { onLoggedIn: (email: string) => void }) {
+export function LoginScreen({ onLoggedIn }: { onLoggedIn: (me: MeInfo) => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -12,8 +12,7 @@ export function LoginScreen({ onLoggedIn }: { onLoggedIn: (email: string) => voi
     setBusy(true);
     setError('');
     try {
-      const user = await login(email, password);
-      onLoggedIn(user.email);
+      onLoggedIn(await login(email, password));
     } catch (err) {
       setError(String((err as Error).message ?? err));
     } finally {

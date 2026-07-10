@@ -1,15 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
 import App, { type WorkbenchMutations } from '../App';
 import type { WorkbenchData } from '../types';
+import { AcceptInviteScreen } from './AcceptInviteScreen';
 import {
-  getDemoClaims, getRun, getRunClaims, logout, me, patchClaim,
+  getDemoClaims, getRun, getRunClaims, logout, me, type MeInfo, patchClaim,
 } from './api';
 import { LoginScreen } from './LoginScreen';
 import { RunsScreen } from './RunsScreen';
 
-type Route = { name: 'runs' } | { name: 'run'; id: string };
+type Route =
+  | { name: 'runs' }
+  | { name: 'run'; id: string }
+  | { name: 'invite'; token: string }
+  | { name: 'org' }
+  | { name: 'admin' };
 
 function parseHash(): Route {
+  const invite = window.location.hash.match(/^#\/invite\/(.+)$/);
+  if (invite) return { name: 'invite', token: invite[1] };
+  if (window.location.hash === '#/org') return { name: 'org' };
+  if (window.location.hash === '#/admin') return { name: 'admin' };
   const m = window.location.hash.match(/^#\/runs\/(.+)$/);
   return m ? { name: 'run', id: m[1] } : { name: 'runs' };
 }
@@ -33,7 +43,7 @@ function makeMutations(): WorkbenchMutations {
 }
 
 export function ServerApp() {
-  const [user, setUser] = useState<string | null | undefined>(undefined);
+  const [user, setUser] = useState<MeInfo | null | undefined>(undefined);
   const [route, setRoute] = useState<Route>(parseHash());
   const [showLogin, setShowLogin] = useState(false);
   const [demo, setDemo] = useState<WorkbenchData | null>(null);
@@ -41,7 +51,7 @@ export function ServerApp() {
   const [runActive, setRunActive] = useState(false);
 
   useEffect(() => {
-    me().then((u) => setUser(u?.email ?? null));
+    me().then(setUser);
     const onHash = () => setRoute(parseHash());
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
@@ -70,11 +80,20 @@ export function ServerApp() {
     return () => clearInterval(t);
   }, [runActive, route, loadRun]);
 
+  if (route.name === 'invite') {
+    return (
+      <AcceptInviteScreen
+        token={route.token}
+        onAccepted={(m) => { setUser(m); window.location.hash = ''; }}
+      />
+    );
+  }
+
   if (user === undefined) return null;
 
   if (!user) {
     if (showLogin) {
-      return <LoginScreen onLoggedIn={(email) => { setUser(email); setShowLogin(false); }} />;
+      return <LoginScreen onLoggedIn={(m) => { setUser(m); setShowLogin(false); }} />;
     }
     return (
       <div>
@@ -89,6 +108,30 @@ export function ServerApp() {
     );
   }
 
+  const chrome = (body: JSX.Element) => (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '8px 20px', borderBottom: '1px solid var(--line)',
+                    fontSize: 12.5 }}>
+        <span style={{ fontWeight: 650 }}>{user.orgName}</span>
+        <div className="spacer" />
+        {user.role === 'admin' && (
+          <button type="button" className="btn"
+                  onClick={() => { window.location.hash = '#/org'; }}>Org Settings</button>
+        )}
+        {user.isPlatformAdmin && (
+          <button type="button" className="btn"
+                  onClick={() => { window.location.hash = '#/admin'; }}>Admin</button>
+        )}
+        <button type="button" className="btn"
+                onClick={() => logout().then(() => { setUser(null); window.location.hash = ''; })}>
+          Log out
+        </button>
+      </div>
+      {body}
+    </div>
+  );
+
   if (route.name === 'run') {
     return (
       <div>
@@ -97,9 +140,11 @@ export function ServerApp() {
           <button type="button" className="backlink" onClick={() => { window.location.hash = ''; }}>
             ← Runs
           </button>
+          <span style={{ fontWeight: 650 }}>{user.orgName}</span>
           {runActive && <span className="pill c-amber">drafting in progress — refreshing</span>}
           <div className="spacer" />
-          <button type="button" className="btn" onClick={() => logout().then(() => setUser(null))}>
+          <button type="button" className="btn"
+                  onClick={() => logout().then(() => { setUser(null); window.location.hash = ''; })}>
             Log out
           </button>
         </div>
@@ -110,5 +155,8 @@ export function ServerApp() {
     );
   }
 
-  return <RunsScreen onOpenRun={(id) => { window.location.hash = `#/runs/${id}`; }} />;
+  if (route.name === 'org') return chrome(<div>org settings placeholder</div>);
+  if (route.name === 'admin') return chrome(<div>platform admin placeholder</div>);
+
+  return chrome(<RunsScreen onOpenRun={(id) => { window.location.hash = `#/runs/${id}`; }} />);
 }
