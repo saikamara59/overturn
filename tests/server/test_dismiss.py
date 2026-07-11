@@ -1,4 +1,6 @@
+import io
 import uuid
+import zipfile
 
 from server.models import AuditEvent, Claim, Run
 from tests.server.conftest import login
@@ -114,3 +116,20 @@ def test_retry_never_requeues_dismissed(client, session_factory):
     assert r.json() == {"requeued": 1}  # only the failed one, not the dismissed
     with session_factory() as s:
         assert s.get(Claim, uuid.UUID(entries[0]["dbId"])).status == "dismissed"
+
+
+def test_letters_zip_excludes_dismissed(client, session_factory):
+    run_id = drafted_run(client, session_factory)
+    entries = claims_of(client, run_id)
+    dismissed_id, dismissed_claim_id = entries[0]["dbId"], entries[0]["id"]
+    other_claim_ids = [e["id"] for e in entries[1:]]
+
+    r = client.patch(f"/api/v1/claims/{dismissed_id}", json={"status": "dismissed"})
+    assert r.status_code == 200
+
+    z = client.get(f"/api/v1/runs/{run_id}/letters.zip")
+    assert z.status_code == 200
+    names = zipfile.ZipFile(io.BytesIO(z.content)).namelist()
+    assert f"{dismissed_claim_id}-appeal.md" not in names
+    for cid in other_claim_ids:
+        assert f"{cid}-appeal.md" in names

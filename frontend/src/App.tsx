@@ -68,7 +68,9 @@ export default function App({
   };
 
   const onExportSelected = () => {
-    const sel = data.claims.filter((c) => selected[c.id] && c.letter);
+    const sel = data.claims.filter(
+      (c) => selected[c.id] && c.letter && effectiveStatus(c, statusOverrides) !== 'Dismissed',
+    );
     sel.forEach((c) => downloadLetter(c, letters[c.id]));
     showToast(`${sel.length} letter${sel.length === 1 ? '' : 's'} exported`);
   };

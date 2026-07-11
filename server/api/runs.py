@@ -162,7 +162,7 @@ def run_letters_zip(
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for claim in _ordered_claims(session, run.id):
-            if claim.letter:
+            if claim.letter and claim.status != "dismissed":
                 z.writestr(f"{claim.claim_id}-appeal.md", letter_markdown(claim))
     return Response(
         buf.getvalue(),
