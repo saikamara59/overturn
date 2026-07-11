@@ -22,7 +22,7 @@ def drafted_run(client, session_factory):
 def test_worklist_payload_shape(client, session_factory):
     run_id = drafted_run(client, session_factory)
     data = client.get(f"/api/v1/runs/{run_id}/claims").json()
-    assert data["summary"] == {"processed": 3, "drafts": 3, "failed": 0}
+    assert data["summary"] == {"processed": 3, "drafts": 3, "failed": 0, "dismissed": 0}
     assert data["totalBilled"] == 21230.25
     assert data["model"]  # recorded by DbInvocationTracker
     ids = [c["id"] for c in data["claims"]]

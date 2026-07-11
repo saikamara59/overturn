@@ -107,5 +107,5 @@ export const getDemoClaims = () => request<WorkbenchData>('/api/v1/demo/claims')
 export const getDemoAudit = () => request<AuditEvent[]>('/api/v1/demo/audit');
 export const patchClaim = (
   dbId: string,
-  body: { letter?: string | null; status?: 'submitted' },
+  body: { letter?: string | null; status?: 'submitted' | 'dismissed' | 'restored'; dismissReason?: string | null },
 ) => request<Claim>(`/api/v1/claims/${dbId}`, json('PATCH', body));

@@ -86,6 +86,7 @@ class Claim(Base):
     refined: Mapped[str | None] = mapped_column(Text, default=None)
     rule: Mapped[str | None] = mapped_column(Text, default=None)
     error: Mapped[str | None] = mapped_column(Text, default=None)
+    dismiss_reason: Mapped[str | None] = mapped_column(Text, default=None)
     status: Mapped[str] = mapped_column(default="queued")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow

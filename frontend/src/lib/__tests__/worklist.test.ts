@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import type { Claim } from '../../types';
 import { fmtDate, fmtMoney } from '../format';
 import {
-  bucketOf, daysChip, effectiveStatus, letterFileFor, visibleSorted,
+  bucketOf, daysChip, effectiveStatus, filterGroups, letterFileFor, statusStyle, visibleSorted,
 } from '../worklist';
 
 const claim = (over: Partial<Claim>): Claim => ({
@@ -75,6 +75,38 @@ describe('visibleSorted', () => {
   test('bucket filter matches bucketOf', () => {
     const ids = visibleSorted(claims, { ...noFilters, fBucket: ['No deadline'] }, { col: 'urgency', dir: 'asc' }, {}).map(c => c.id);
     expect(ids).toEqual(['B']);
+  });
+});
+
+describe('dismissed filtering', () => {
+  const claims = [
+    claim({ id: 'A', days: 5 }),
+    claim({ id: 'B', days: 6 }),
+  ];
+  const noFilters = { fCarc: [], fPayer: [], fStatus: [], fBucket: [] };
+  const overrides = { B: 'Dismissed' };
+
+  test('dismissed hidden by default', () => {
+    const ids = visibleSorted(claims, noFilters, { col: 'urgency', dir: 'asc' }, overrides).map(c => c.id);
+    expect(ids).toEqual(['A']);
+  });
+
+  test('Dismissed status filter reveals them', () => {
+    const ids = visibleSorted(claims, { ...noFilters, fStatus: ['Dismissed'] },
+      { col: 'urgency', dir: 'asc' }, overrides).map(c => c.id);
+    expect(ids).toEqual(['B']);
+  });
+
+  test('non-status filter counts exclude dismissed', () => {
+    const groups = filterGroups(claims, overrides);
+    const carc = groups.find(g => g.key === 'fCarc')!;
+    expect(carc.items.find(i => i.label === 'CO-50')!.count).toBe(1);
+    const status = groups.find(g => g.key === 'fStatus')!;
+    expect(status.items.find(i => i.label === 'Dismissed')!.count).toBe(1);
+  });
+
+  test('statusStyle knows Dismissed', () => {
+    expect(statusStyle('Dismissed').cls).toBe('c-gray');
   });
 });
 

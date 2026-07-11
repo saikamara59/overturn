@@ -119,6 +119,11 @@ export function SummaryScreen({ data, statusOverrides, onBack }: Props) {
                 expire{hot.length === 1 ? 's' : ''} within 7 days.
               </div>
             )}
+            {(data.summary.dismissed ?? 0) > 0 && (
+              <div className="sm-note">
+                {data.summary.dismissed} dismissed (won't appeal).
+              </div>
+            )}
           </div>
           <div className="panel">
             <div className="panel-head">

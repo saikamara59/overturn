@@ -103,7 +103,7 @@ def retry_run(run: Run = Depends(scoped_run)) -> dict:
         raise HTTPException(409, detail="demo run is read-only")
     requeued = 0
     for claim in run.claims:
-        if claim.status not in ("draft_ready", "submitted"):
+        if claim.status not in ("draft_ready", "submitted", "dismissed"):
             claim.status = "queued"
             claim.error = None
             requeued += 1
@@ -162,7 +162,7 @@ def run_letters_zip(
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for claim in _ordered_claims(session, run.id):
-            if claim.letter:
+            if claim.letter and claim.status != "dismissed":
                 z.writestr(f"{claim.claim_id}-appeal.md", letter_markdown(claim))
     return Response(
         buf.getvalue(),

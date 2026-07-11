@@ -74,3 +74,8 @@ test('export triggers a download', async () => {
 
   clickSpy.mockRestore();
 });
+
+test('island mode shows no Dismiss button', async () => {
+  await openClaim('CLM-0001');
+  expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeInTheDocument();
+});

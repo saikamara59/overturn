@@ -32,6 +32,25 @@ test('upload → draft → approve → persists across reload', async ({ page })
   await page.reload();
   await page.getByText('CLM-E2E-1').click();
   await expect(page.getByText('Submitted').first()).toBeVisible();
+
+  // dismiss the second claim with a reason; it leaves the default worklist
+  await page.getByRole('button', { name: '← Worklist' }).click();
+  await page.getByText('CLM-E2E-2').first().click();
+  await page.getByRole('button', { name: 'Dismiss' }).click();
+  await page.getByLabel(/reason/i).selectOption('too_small');
+  await page.getByRole('button', { name: /confirm dismiss/i }).click();
+  await expect(page.getByText(/won't appeal/i)).toBeVisible();
+
+  await page.getByRole('button', { name: '← Worklist' }).click();
+  await expect(page.getByText('CLM-E2E-2')).not.toBeVisible();
+
+  // reload → still dismissed; reveal via the status filter and restore
+  await page.reload();
+  await expect(page.getByText('CLM-E2E-2')).not.toBeVisible();
+  await page.locator('.fitem', { hasText: 'Dismissed' }).click();  // status filter row
+  await page.getByText('CLM-E2E-2').first().click();
+  await page.getByRole('button', { name: 'Restore' }).click();
+  await expect(page.getByRole('button', { name: 'Approve' })).toBeVisible();
 });
 
 test('multi-tenant onboarding: provision org → invite → isolated workspace', async ({ page, browser }) => {

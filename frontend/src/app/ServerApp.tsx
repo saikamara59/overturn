@@ -41,6 +41,14 @@ function makeMutations(): WorkbenchMutations {
       const updated = await patchClaim(c.dbId, { letter: null });
       return updated.letter ?? '';
     },
+    async dismiss(c, reason) {
+      if (!c.dbId) throw new Error('read-only view');
+      return patchClaim(c.dbId, { status: 'dismissed', dismissReason: reason ?? null });
+    },
+    async restore(c) {
+      if (!c.dbId) throw new Error('read-only view');
+      return patchClaim(c.dbId, { status: 'restored' });
+    },
   };
 }
 

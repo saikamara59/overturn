@@ -1,20 +1,35 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { Claim } from '../../types';
 
 interface Props {
   claim: Claim;
   model: string | null;
   generatedOn: string | null;
-  failed: boolean;
+  status: string;
   letter: string;
   onLetterChange: (text: string) => void;
   onApprove: () => void;
   onRevert: () => void;
   onExport: () => void;
+  onDismiss?: (reason?: string) => void;
+  onRestore?: () => void;
+  dismissReason?: string;
 }
+
+export const REASON_LABELS: Record<string, string> = {
+  payer_correct: 'payer was correct',
+  too_small: 'amount too small',
+  deadline_passed: 'deadline passed',
+  other: 'other',
+};
 
 export function AppealCard(p: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showReason, setShowReason] = useState(false);
+  const [reason, setReason] = useState('');
+  const failed = p.status === 'Failed';
+  const dismissed = p.status === 'Dismissed';
+  const hasLetter = !!p.claim.letter;
   return (
     <div className="card appeal-card">
       <div className="card-head">
@@ -26,7 +41,14 @@ export function AppealCard(p: Props) {
         {p.claim.rule && <div>Cites <b>{p.claim.rule}</b></div>}
         <div>Generated <b>{p.generatedOn ?? '—'}</b></div>
       </div>
-      {p.failed ? (
+      {dismissed && (
+        <div className="fail-banner" style={{ background: 'var(--gray-bg)', borderColor: 'var(--line-2)' }}>
+          <div className="t" style={{ color: 'var(--gray-fg)' }}>
+            Dismissed — won't appeal{p.dismissReason ? ` (${REASON_LABELS[p.dismissReason] ?? p.dismissReason})` : ''}
+          </div>
+        </div>
+      )}
+      {failed || (dismissed && !hasLetter) ? (
         <div className="fail-banner">
           <div className="t">No appeal drafted</div>
           <div className="b">
@@ -41,7 +63,8 @@ export function AppealCard(p: Props) {
             className="letter"
             spellCheck={false}
             value={p.letter}
-            onChange={(e) => p.onLetterChange(e.target.value)}
+            disabled={dismissed}
+            onChange={(e) => { if (!dismissed) p.onLetterChange(e.target.value); }}
           />
           {p.claim.refined && (
             <div className="refined">
@@ -52,15 +75,45 @@ export function AppealCard(p: Props) {
         </>
       )}
       <div className="actions">
-        {!p.failed && (
+        {dismissed ? (
+          p.onRestore && (
+            <button type="button" className="btn-primary" onClick={p.onRestore}>Restore</button>
+          )
+        ) : failed ? (
+          p.onDismiss && !showReason && (
+            <button type="button" className="btn" onClick={() => setShowReason(true)}>Dismiss</button>
+          )
+        ) : (
           <>
             <button type="button" className="btn-primary" onClick={p.onApprove}>Approve</button>
             <button type="button" className="btn" onClick={() => textareaRef.current?.focus()}>Edit</button>
             <button type="button" className="btn" onClick={p.onRevert}>Revert draft</button>
+            {p.onDismiss && !showReason && (
+              <button type="button" className="btn" onClick={() => setShowReason(true)}>Dismiss</button>
+            )}
           </>
         )}
+        {showReason && !dismissed && (
+          <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+            <label style={{ fontSize: 12.5, color: 'var(--mut)' }}>
+              Reason
+              <select value={reason} onChange={(e) => setReason(e.target.value)}
+                      style={{ font: 'inherit', fontSize: 12.5, marginLeft: 6 }}>
+                <option value="">(none)</option>
+                {Object.entries(REASON_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </label>
+            <button type="button" className="btn"
+                    onClick={() => { p.onDismiss?.(reason || undefined); setShowReason(false); }}>
+              Confirm dismiss
+            </button>
+            <button type="button" className="btn" onClick={() => setShowReason(false)}>Cancel</button>
+          </span>
+        )}
         <div className="spacer" />
-        {!p.failed && (
+        {!failed && !dismissed && (
           <button type="button" className="btn" onClick={p.onExport}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
