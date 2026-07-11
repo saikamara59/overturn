@@ -6,6 +6,7 @@ import {
   getDemoClaims, getRun, getRunClaims, logout, me, type MeInfo, patchClaim,
 } from './api';
 import { LoginScreen } from './LoginScreen';
+import { OrgSettingsScreen } from './OrgSettingsScreen';
 import { RunsScreen } from './RunsScreen';
 
 type Route =
@@ -155,7 +156,13 @@ export function ServerApp() {
     );
   }
 
-  if (route.name === 'org') return chrome(<div>org settings placeholder</div>);
+  if (route.name === 'org') {
+    if (user.role !== 'admin') {
+      window.location.hash = '';
+      return null;
+    }
+    return chrome(<OrgSettingsScreen onBack={() => { window.location.hash = ''; }} />);
+  }
   if (route.name === 'admin') return chrome(<div>platform admin placeholder</div>);
 
   return chrome(<RunsScreen onOpenRun={(id) => { window.location.hash = `#/runs/${id}`; }} />);
