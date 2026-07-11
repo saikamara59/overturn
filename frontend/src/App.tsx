@@ -135,7 +135,7 @@ export default function App({
             mutations.dismiss(claim, reason).then((updated) => {
               setStatusOverrides((o) => ({ ...o, [claim.id]: updated.status as string }));
               setDismissReasons((d) => ({ ...d, [claim.id]: reason }));
-              showToast(`${claim.id} dismissed — won't appeal`);
+              showToast(`${claim.id} dismissed`);
             }).catch((e) => showToast(String((e as Error).message ?? e)));
           } : undefined}
           onRestore={mutations ? () => {

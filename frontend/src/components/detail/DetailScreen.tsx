@@ -38,12 +38,15 @@ export function DetailScreen(p: Props) {
           claim={p.claim}
           model={p.model}
           generatedOn={p.generatedOn}
-          failed={p.status === 'Failed'}
+          status={p.status}
           letter={p.letter}
           onLetterChange={p.onLetterChange}
           onApprove={p.onApprove}
           onRevert={p.onRevert}
           onExport={p.onExport}
+          onDismiss={p.onDismiss}
+          onRestore={p.onRestore}
+          dismissReason={p.dismissReason}
         />
       </div>
     </div>

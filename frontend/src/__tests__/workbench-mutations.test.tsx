@@ -66,3 +66,29 @@ test('approve failure shows error toast and keeps status', async () => {
   expect(await screen.findByRole('status')).toHaveTextContent('offline');
   expect(screen.queryByText('Submitted')).not.toBeInTheDocument();
 });
+
+test('dismiss flow: button → reason picker → mutation → dismissed banner', async () => {
+  const m = mutations();
+  render(<App data={SAMPLE_DATA} mutations={m} />);
+  await userEvent.click(screen.getByText('CLM-0001'));
+  await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+  await userEvent.selectOptions(screen.getByLabelText(/reason/i), 'too_small');
+  await userEvent.click(screen.getByRole('button', { name: /confirm dismiss/i }));
+  expect(m.dismiss).toHaveBeenCalledWith(expect.anything(), 'too_small');
+  expect(await screen.findByText(/won't appeal/i)).toBeInTheDocument();
+  // actions replaced by Restore; letter read-only
+  expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Restore' })).toBeInTheDocument();
+  expect(screen.getByRole('textbox')).toBeDisabled();
+});
+
+test('restore flow returns claim to worklist state', async () => {
+  const m = mutations();
+  render(<App data={SAMPLE_DATA} mutations={m} />);
+  await userEvent.click(screen.getByText('CLM-0001'));
+  await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+  await userEvent.click(screen.getByRole('button', { name: /confirm dismiss/i }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Restore' }));
+  expect(m.restore).toHaveBeenCalledOnce();
+  expect(await screen.findByRole('button', { name: 'Approve' })).toBeInTheDocument();
+});
