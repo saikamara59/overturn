@@ -1,7 +1,14 @@
 """Shared fixtures: deterministic remittance files and dry-run agents."""
+import os
 from pathlib import Path
 
 import pytest
+
+# CLI-output assertions must not depend on the host terminal's capabilities
+# (COLORTERM/TERM leak into Rich under the Click test runner; NO_COLOR alone
+# still leaves bold/highlight escapes that split numbers mid-string).
+os.environ["NO_COLOR"] = "1"
+os.environ["TERM"] = "dumb"
 
 SAMPLE_CSV = """\
 claim_id,payer,carc_code,rarc_codes,denial_reason_text,billed_amount,service_date,denial_date,appeal_deadline

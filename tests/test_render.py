@@ -34,7 +34,9 @@ class TestWorklistTable:
         ]
 
         table = build_worklist_table(outcomes, today=TODAY)
-        console = Console(record=True, width=200)
+        # _environ={} isolates this Console from the suite's TERM=dumb guard
+        # (dumb terminals cap Rich's width and would wrap the table rows).
+        console = Console(record=True, width=200, _environ={})
         console.print(table)
         text = console.export_text()
 
