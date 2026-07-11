@@ -15,6 +15,9 @@ interface Props {
   onApprove: () => void;
   onRevert: () => void;
   onExport: () => void;
+  onDismiss?: (reason?: string) => void;
+  onRestore?: () => void;
+  dismissReason?: string;
 }
 
 export function DetailScreen(p: Props) {

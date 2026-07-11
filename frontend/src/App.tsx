@@ -16,6 +16,8 @@ export interface WorkbenchMutations {
   approve(c: Claim): Promise<void>;
   saveLetter(c: Claim, text: string): Promise<void>;
   revertLetter(c: Claim): Promise<string>;
+  dismiss(c: Claim, reason?: string): Promise<Claim>;
+  restore(c: Claim): Promise<Claim>;
 }
 
 export default function App({
@@ -29,6 +31,7 @@ export default function App({
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [letters, setLetters] = useState<Record<string, string>>({});
   const [statusOverrides, setStatusOverrides] = useState<StatusOverrides>({});
+  const [dismissReasons, setDismissReasons] = useState<Record<string, string | undefined>>({});
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -128,6 +131,21 @@ export default function App({
             downloadLetter(claim, letters[claim.id]);
             showToast(`Exported ${claim.id}-appeal.md`);
           }}
+          onDismiss={mutations ? (reason?: string) => {
+            mutations.dismiss(claim, reason).then((updated) => {
+              setStatusOverrides((o) => ({ ...o, [claim.id]: updated.status as string }));
+              setDismissReasons((d) => ({ ...d, [claim.id]: reason }));
+              showToast(`${claim.id} dismissed — won't appeal`);
+            }).catch((e) => showToast(String((e as Error).message ?? e)));
+          } : undefined}
+          onRestore={mutations ? () => {
+            mutations.restore(claim).then((updated) => {
+              setStatusOverrides((o) => ({ ...o, [claim.id]: updated.status as string }));
+              setDismissReasons((d) => ({ ...d, [claim.id]: undefined }));
+              showToast(`${claim.id} restored to the worklist`);
+            }).catch((e) => showToast(String((e as Error).message ?? e)));
+          } : undefined}
+          dismissReason={dismissReasons[claim.id] ?? claim.dismissReason ?? undefined}
         />
       );
     }

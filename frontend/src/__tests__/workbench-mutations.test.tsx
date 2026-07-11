@@ -13,6 +13,8 @@ function mutations(over: Partial<WorkbenchMutations> = {}): WorkbenchMutations {
     approve: vi.fn().mockResolvedValue(undefined),
     saveLetter: vi.fn().mockResolvedValue(undefined),
     revertLetter: vi.fn().mockResolvedValue('ORIGINAL FROM SERVER'),
+    dismiss: vi.fn().mockResolvedValue({ status: 'Dismissed' }),
+    restore: vi.fn().mockResolvedValue({ status: 'Draft Ready' }),
     ...over,
   };
 }

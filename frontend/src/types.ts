@@ -15,6 +15,7 @@ export interface Claim {
   refined: string | null;
   rule: string | null;
   error: string | null;
+  dismissReason?: string | null;
   /** Server row id for mutations; absent in static-report (island) mode. */
   dbId?: string;
 }
@@ -31,7 +32,7 @@ export interface WorkbenchData {
   model: string | null;
   totalBilled: number;
   claims: Claim[];
-  summary: { processed: number; drafts: number; failed: number };
+  summary: { processed: number; drafts: number; failed: number; dismissed?: number };
   audit: AuditEvent[];
 }
 
