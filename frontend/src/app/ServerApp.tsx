@@ -7,6 +7,7 @@ import {
 } from './api';
 import { LoginScreen } from './LoginScreen';
 import { OrgSettingsScreen } from './OrgSettingsScreen';
+import { PlatformAdminScreen } from './PlatformAdminScreen';
 import { RunsScreen } from './RunsScreen';
 
 type Route =
@@ -163,7 +164,13 @@ export function ServerApp() {
     }
     return chrome(<OrgSettingsScreen onBack={() => { window.location.hash = ''; }} />);
   }
-  if (route.name === 'admin') return chrome(<div>platform admin placeholder</div>);
+  if (route.name === 'admin') {
+    if (!user.isPlatformAdmin) {
+      window.location.hash = '';
+      return null;
+    }
+    return chrome(<PlatformAdminScreen onBack={() => { window.location.hash = ''; }} />);
+  }
 
   return chrome(<RunsScreen onOpenRun={(id) => { window.location.hash = `#/runs/${id}`; }} />);
 }
