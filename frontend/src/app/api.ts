@@ -6,6 +6,16 @@ export class ApiError extends Error {
   }
 }
 
+export interface MeInfo {
+  email: string; orgId: string; orgName: string;
+  role: 'admin' | 'member'; isPlatformAdmin: boolean;
+}
+export interface OrgInfo { id: string; name: string; role: string; hasApiKey: boolean; apiKeyLast4: string | null }
+export interface MemberInfo { userId: string; email: string; role: string; joinedAt: string }
+export interface InviteInfo { id: string; token: string; inviteUrl: string; role: string; email: string | null; expiresAt: string }
+export interface InvitePeek { orgName: string; role: string; email: string | null; expiresAt: string }
+export interface AdminOrg { id: string; name: string; status: string; members: number; runs: number }
+
 export interface RunInfo {
   id: string;
   filename: string;
@@ -41,18 +51,42 @@ const json = (method: string, body: unknown): RequestInit => ({
 });
 
 export const login = (email: string, password: string) =>
-  request<{ email: string }>('/api/v1/auth/login', json('POST', { email, password }));
+  request<MeInfo>('/api/v1/auth/login', json('POST', { email, password }));
 
 export const logout = () => request<{ ok: boolean }>('/api/v1/auth/logout', { method: 'POST' });
 
-export async function me(): Promise<{ email: string } | null> {
+export async function me(): Promise<MeInfo | null> {
   try {
-    return await request<{ email: string }>('/api/v1/auth/me');
+    return await request<MeInfo>('/api/v1/auth/me');
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) return null;
     throw e;
   }
 }
+
+export const getOrg = () => request<OrgInfo>('/api/v1/org');
+export const setOrgApiKey = (key: string) =>
+  request<{ hasApiKey: boolean; apiKeyLast4: string }>('/api/v1/org/api-key', json('PUT', { key }));
+export const clearOrgApiKey = () =>
+  request<{ hasApiKey: boolean }>('/api/v1/org/api-key', { method: 'DELETE' });
+export const listMembers = () => request<MemberInfo[]>('/api/v1/org/members');
+export const setMemberRole = (userId: string, role: string) =>
+  request<{ userId: string; role: string }>(`/api/v1/org/members/${userId}`, json('PATCH', { role }));
+export const removeMember = (userId: string) =>
+  request<{ removed: string }>(`/api/v1/org/members/${userId}`, { method: 'DELETE' });
+export const createInvite = (role: string, email?: string) =>
+  request<InviteInfo>('/api/v1/org/invites', json('POST', { role, email: email || null }));
+export const listInvites = () => request<InviteInfo[]>('/api/v1/org/invites');
+export const revokeInvite = (id: string) =>
+  request<{ revoked: string }>(`/api/v1/org/invites/${id}`, { method: 'DELETE' });
+export const peekInvite = (token: string) => request<InvitePeek>(`/api/v1/invites/${token}`);
+export const acceptInvite = (token: string, email: string, password: string) =>
+  request<MeInfo>(`/api/v1/invites/${token}/accept`, json('POST', { email, password }));
+export const adminListOrgs = () => request<AdminOrg[]>('/api/v1/admin/orgs');
+export const adminCreateOrg = (name: string) =>
+  request<{ org: AdminOrg; inviteUrl: string; token: string }>('/api/v1/admin/orgs', json('POST', { name }));
+export const adminSetOrgStatus = (id: string, status: string) =>
+  request<{ id: string; status: string }>(`/api/v1/admin/orgs/${id}`, json('PATCH', { status }));
 
 export function uploadRun(file: File, dryRun: boolean): Promise<{ runId: string }> {
   const body = new FormData();

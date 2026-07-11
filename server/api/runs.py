@@ -13,19 +13,11 @@ from healthflow_agents.tools.remittance_parser import (
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from server.api.deps import get_session
+from server.api.deps import OrgContext, current_org, get_session, scoped_run
 from server.models import AuditEvent, Claim, Run
 from server.payloads import audit_entries, letter_markdown, run_payload, worklist_payload
-from server.security import require_user
 
 router = APIRouter(prefix="/runs", tags=["runs"])
-
-
-def get_run_or_404(session: Session, run_id: uuid.UUID) -> Run:
-    run = session.get(Run, run_id)
-    if run is None:
-        raise HTTPException(status_code=404, detail="run not found")
-    return run
 
 
 @router.post("", status_code=202)
@@ -34,7 +26,7 @@ async def create_run(
     file: UploadFile = File(...),
     dry_run: bool = Form(False),
     session: Session = Depends(get_session),
-    _user: str = Depends(require_user),
+    ctx: OrgContext = Depends(current_org),
 ) -> dict:
     settings = request.app.state.settings
     suffix = Path(file.filename or "").suffix.lower()
@@ -60,10 +52,13 @@ async def create_run(
                 f"{settings.max_upload_records}"
             ),
         )
-    if not dry_run and not settings.anthropic_api_key:
+    if not dry_run and not ctx.org.anthropic_key_encrypted:
         raise HTTPException(
             422,
-            detail="ANTHROPIC_API_KEY is not configured on this server; upload with dry_run",
+            detail=(
+                "organization has no API key configured; upload with dry_run "
+                "or add a key in Org Settings"
+            ),
         )
 
     run = Run(
@@ -71,6 +66,7 @@ async def create_run(
         dry_run=dry_run,
         total_records=len(records),
         total_billed=round(sum(r.billed_amount for r in records), 2),
+        org_id=ctx.org.id,
     )
     session.add(run)
     session.flush()
@@ -88,28 +84,21 @@ async def create_run(
 @router.get("")
 def list_runs(
     session: Session = Depends(get_session),
-    _user: str = Depends(require_user),
+    ctx: OrgContext = Depends(current_org),
 ) -> list[dict]:
-    runs = session.scalars(select(Run).order_by(Run.created_at.desc())).all()
+    runs = session.scalars(
+        select(Run).where(Run.org_id == ctx.org.id).order_by(Run.created_at.desc())
+    ).all()
     return [run_payload(r) for r in runs]
 
 
 @router.get("/{run_id}")
-def get_run(
-    run_id: uuid.UUID,
-    session: Session = Depends(get_session),
-    _user: str = Depends(require_user),
-) -> dict:
-    return run_payload(get_run_or_404(session, run_id))
+def get_run(run: Run = Depends(scoped_run)) -> dict:
+    return run_payload(run)
 
 
 @router.post("/{run_id}/retry")
-def retry_run(
-    run_id: uuid.UUID,
-    session: Session = Depends(get_session),
-    _user: str = Depends(require_user),
-) -> dict:
-    run = get_run_or_404(session, run_id)
+def retry_run(run: Run = Depends(scoped_run)) -> dict:
     if run.is_demo:
         raise HTTPException(409, detail="demo run is read-only")
     requeued = 0
@@ -137,48 +126,42 @@ def _ordered_claims(session: Session, run_id: uuid.UUID) -> list[Claim]:
 
 @router.get("/{run_id}/claims")
 def run_claims(
-    run_id: uuid.UUID,
+    run: Run = Depends(scoped_run),
     session: Session = Depends(get_session),
-    _user: str = Depends(require_user),
 ) -> dict:
-    run = get_run_or_404(session, run_id)
     model = session.scalars(
         select(AuditEvent.model)
-        .where(AuditEvent.run_id == run_id, AuditEvent.model.is_not(None))
+        .where(AuditEvent.run_id == run.id, AuditEvent.model.is_not(None))
         .order_by(AuditEvent.id)
         .limit(1)
     ).first()
     events = session.scalars(
-        select(AuditEvent).where(AuditEvent.run_id == run_id).order_by(AuditEvent.id)
+        select(AuditEvent).where(AuditEvent.run_id == run.id).order_by(AuditEvent.id)
     ).all()
     return worklist_payload(
-        run, _ordered_claims(session, run_id), model, date.today(), audit_entries(list(events))
+        run, _ordered_claims(session, run.id), model, date.today(), audit_entries(list(events))
     )
 
 
 @router.get("/{run_id}/audit")
 def run_audit(
-    run_id: uuid.UUID,
+    run: Run = Depends(scoped_run),
     session: Session = Depends(get_session),
-    _user: str = Depends(require_user),
 ) -> list[dict]:
-    get_run_or_404(session, run_id)
     events = session.scalars(
-        select(AuditEvent).where(AuditEvent.run_id == run_id).order_by(AuditEvent.id)
+        select(AuditEvent).where(AuditEvent.run_id == run.id).order_by(AuditEvent.id)
     ).all()
     return audit_entries(list(events))
 
 
 @router.get("/{run_id}/letters.zip")
 def run_letters_zip(
-    run_id: uuid.UUID,
+    run: Run = Depends(scoped_run),
     session: Session = Depends(get_session),
-    _user: str = Depends(require_user),
 ) -> Response:
-    get_run_or_404(session, run_id)
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        for claim in _ordered_claims(session, run_id):
+        for claim in _ordered_claims(session, run.id):
             if claim.letter:
                 z.writestr(f"{claim.claim_id}-appeal.md", letter_markdown(claim))
     return Response(

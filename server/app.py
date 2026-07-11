@@ -6,7 +6,7 @@ from fastapi import APIRouter, FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.staticfiles import StaticFiles
 
-from server.api import auth, claims, demo, runs
+from server.api import admin, auth, claims, demo, invites, org, runs
 from server.config import Settings, get_settings
 from server.db import make_engine, make_session_factory
 
@@ -14,6 +14,8 @@ from server.db import make_engine, make_session_factory
 def create_app(settings: Settings, session_factory) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        from server.seed import seed_platform
+        seed_platform(session_factory, settings)
         if settings.demo_mode:
             from server.demo import seed_demo
             seed_demo(session_factory)
@@ -22,15 +24,21 @@ def create_app(settings: Settings, session_factory) -> FastAPI:
     app = FastAPI(title="Overturn", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.session_factory = session_factory
+    from server.crypto import KeyVault
+    app.state.key_vault = KeyVault(settings.key_encryption_secret)
     app.add_middleware(
         SessionMiddleware, secret_key=settings.secret_key, https_only=settings.secure_cookies
     )
 
     api = APIRouter(prefix="/api/v1")
     api.include_router(auth.router)
+    api.include_router(org.router)
     api.include_router(runs.router)
     api.include_router(claims.router)
     api.include_router(demo.router)
+    api.include_router(invites.org_router)
+    api.include_router(invites.public_router)
+    api.include_router(admin.router)
     app.include_router(api)
 
     spa_dir = Path(settings.spa_dir) if settings.spa_dir else (
@@ -53,4 +61,14 @@ app = None  # populated lazily for uvicorn: `uvicorn server.app:app --factory` n
 try:  # pragma: no cover - production path only
     app = build_app()
 except Exception:  # missing env in dev/test contexts is fine; tests use create_app
+    import sys
+    import traceback
+
+    traceback.print_exc()
+    print(
+        "FATAL: server configuration invalid — app failed to build; see the "
+        "error above (likely missing/invalid environment variables). "
+        "`server.app:app` is None and every request will fail until fixed.",
+        file=sys.stderr,
+    )
     app = None

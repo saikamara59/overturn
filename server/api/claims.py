@@ -1,14 +1,11 @@
-import uuid
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
-from server.api.deps import get_session
+from server.api.deps import scoped_claim
 from server.models import Claim, utcnow
 from server.payloads import claim_entry, letter_markdown
-from server.security import require_user
 
 router = APIRouter(prefix="/claims", tags=["claims"])
 
@@ -18,30 +15,13 @@ class ClaimPatch(BaseModel):
     status: str | None = None
 
 
-def get_claim_or_404(session: Session, claim_id: uuid.UUID) -> Claim:
-    claim = session.get(Claim, claim_id)
-    if claim is None:
-        raise HTTPException(status_code=404, detail="claim not found")
-    return claim
-
-
 @router.get("/{claim_id}")
-def get_claim(
-    claim_id: uuid.UUID,
-    session: Session = Depends(get_session),
-    _user: str = Depends(require_user),
-) -> dict:
-    return claim_entry(get_claim_or_404(session, claim_id), date.today())
+def get_claim(claim: Claim = Depends(scoped_claim)) -> dict:
+    return claim_entry(claim, date.today())
 
 
 @router.patch("/{claim_id}")
-def patch_claim(
-    claim_id: uuid.UUID,
-    patch: ClaimPatch,
-    session: Session = Depends(get_session),
-    _user: str = Depends(require_user),
-) -> dict:
-    claim = get_claim_or_404(session, claim_id)
+def patch_claim(patch: ClaimPatch, claim: Claim = Depends(scoped_claim)) -> dict:
     if claim.run.is_demo:
         raise HTTPException(409, detail="demo run is read-only")
     if claim.status not in ("draft_ready", "submitted"):
@@ -58,12 +38,7 @@ def patch_claim(
 
 
 @router.get("/{claim_id}/letter.md")
-def claim_letter(
-    claim_id: uuid.UUID,
-    session: Session = Depends(get_session),
-    _user: str = Depends(require_user),
-) -> Response:
-    claim = get_claim_or_404(session, claim_id)
+def claim_letter(claim: Claim = Depends(scoped_claim)) -> Response:
     if not claim.letter:
         raise HTTPException(404, detail="no letter drafted for this claim")
     return Response(

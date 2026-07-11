@@ -35,7 +35,9 @@ test('logged out: demo workbench with sign-in affordance', async () => {
 test('login flow reaches the runs screen', async () => {
   fetchMock.mockImplementation((url: string, init?: RequestInit) => {
     if (url === '/api/v1/auth/me') return ok({ detail: 'x' }, 401);
-    if (url === '/api/v1/auth/login') return ok({ email: 'a@b.c' });
+    if (url === '/api/v1/auth/login') {
+      return ok({ email: 'a@b.c', orgId: 'o1', orgName: 'Acme RCM', role: 'member', isPlatformAdmin: false });
+    }
     if (url === '/api/v1/runs' && (!init || !init.method)) return ok([RUN]);
     if (url === '/api/v1/demo/claims') return ok(SAMPLE_DATA);
     return ok({}, 404);
@@ -52,7 +54,9 @@ test('login flow reaches the runs screen', async () => {
 test('opening a run loads the workbench via hash route', async () => {
   window.location.hash = '#/runs/r1';
   fetchMock.mockImplementation((url: string) => {
-    if (url === '/api/v1/auth/me') return ok({ email: 'a@b.c' });
+    if (url === '/api/v1/auth/me') {
+      return ok({ email: 'a@b.c', orgId: 'o1', orgName: 'Acme RCM', role: 'member', isPlatformAdmin: false });
+    }
     if (url === '/api/v1/runs/r1') return ok(RUN);
     if (url === '/api/v1/runs/r1/claims') return ok(SAMPLE_DATA);
     return ok({}, 404);
