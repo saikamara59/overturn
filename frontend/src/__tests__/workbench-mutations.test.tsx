@@ -92,3 +92,15 @@ test('restore flow returns claim to worklist state', async () => {
   expect(m.restore).toHaveBeenCalledOnce();
   expect(await screen.findByRole('button', { name: 'Approve' })).toBeInTheDocument();
 });
+
+test('dismissing a claim with no letter shows failure info and no textarea', async () => {
+  const m = mutations();
+  render(<App data={SAMPLE_DATA} mutations={m} />);
+  await userEvent.click(screen.getByText('CLM-0004'));
+  await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+  await userEvent.click(screen.getByRole('button', { name: /confirm dismiss/i }));
+  expect(await screen.findByText(/won't appeal/i)).toBeInTheDocument();
+  expect(screen.getByText(/synthetic failure/)).toBeInTheDocument();
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Restore' })).toBeInTheDocument();
+});

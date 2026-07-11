@@ -29,6 +29,7 @@ export function AppealCard(p: Props) {
   const [reason, setReason] = useState('');
   const failed = p.status === 'Failed';
   const dismissed = p.status === 'Dismissed';
+  const hasLetter = !!p.claim.letter;
   return (
     <div className="card appeal-card">
       <div className="card-head">
@@ -47,7 +48,7 @@ export function AppealCard(p: Props) {
           </div>
         </div>
       )}
-      {failed ? (
+      {failed || (dismissed && !hasLetter) ? (
         <div className="fail-banner">
           <div className="t">No appeal drafted</div>
           <div className="b">
