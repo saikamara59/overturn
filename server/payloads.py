@@ -33,6 +33,7 @@ DISPLAY_STATUS = {
     "draft_ready": "Draft Ready",
     "failed": "Failed",
     "submitted": "Submitted",
+    "dismissed": "Dismissed",
 }
 
 
@@ -56,6 +57,7 @@ def claim_entry(claim: Claim, today: date) -> dict:
         "refined": claim.refined,
         "rule": claim.rule,
         "error": claim.error,
+        "dismissReason": claim.dismiss_reason,
     }
 
 
@@ -72,6 +74,7 @@ def worklist_payload(
             "processed": run.total_records,
             "drafts": run.drafted,
             "failed": run.failed_records,
+            "dismissed": sum(1 for c in claims if c.status == "dismissed"),
         },
         "audit": audit,
     }

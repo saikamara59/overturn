@@ -103,7 +103,7 @@ def retry_run(run: Run = Depends(scoped_run)) -> dict:
         raise HTTPException(409, detail="demo run is read-only")
     requeued = 0
     for claim in run.claims:
-        if claim.status not in ("draft_ready", "submitted"):
+        if claim.status not in ("draft_ready", "submitted", "dismissed"):
             claim.status = "queued"
             claim.error = None
             requeued += 1
