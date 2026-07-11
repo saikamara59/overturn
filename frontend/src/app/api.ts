@@ -1,7 +1,7 @@
 import type { AuditEvent, Claim, WorkbenchData } from '../types';
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public detail?: unknown) {
     super(message);
   }
 }
@@ -10,7 +10,10 @@ export interface MeInfo {
   email: string; orgId: string; orgName: string;
   role: 'admin' | 'member'; isPlatformAdmin: boolean;
 }
-export interface OrgInfo { id: string; name: string; role: string; hasApiKey: boolean; apiKeyLast4: string | null }
+export interface OrgInfo {
+  id: string; name: string; role: string; hasApiKey: boolean; apiKeyLast4: string | null;
+  defaultAppealDays: number;
+}
 export interface MemberInfo { userId: string; email: string; role: string; joinedAt: string }
 export interface InviteInfo { id: string; token: string; inviteUrl: string; role: string; email: string | null; expiresAt: string }
 export interface InvitePeek { orgName: string; role: string; email: string | null; expiresAt: string }
@@ -35,11 +38,13 @@ export interface RunInfo {
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { credentials: 'same-origin', ...init });
   if (!res.ok) {
-    let detail = res.statusText;
+    let message = res.statusText;
+    let detail: unknown;
     try {
-      detail = (await res.json()).detail ?? detail;
+      detail = (await res.json()).detail;
+      message = typeof detail === 'string' ? detail : message;
     } catch { /* non-json error body */ }
-    throw new ApiError(res.status, detail);
+    throw new ApiError(res.status, message, detail);
   }
   return res.json() as Promise<T>;
 }
@@ -64,7 +69,20 @@ export async function me(): Promise<MeInfo | null> {
   }
 }
 
+export type CarcMapping = string | { group: string; code: string };
+export type CsvMappingSpec = Record<string, CarcMapping>;
+export interface SavedCsvMapping {
+  id: string; name: string; headers: string[];
+  mapping: CsvMappingSpec; lastUsedAt: string;
+}
+export interface RowError { row: number; field: string; value: string; message: string }
+
 export const getOrg = () => request<OrgInfo>('/api/v1/org');
+export const patchOrg = (defaultAppealDays: number) =>
+  request<OrgInfo>('/api/v1/org', json('PATCH', { defaultAppealDays }));
+export const listCsvMappings = () => request<SavedCsvMapping[]>('/api/v1/org/csv-mappings');
+export const deleteCsvMapping = (id: string) =>
+  request<{ deleted: string }>(`/api/v1/org/csv-mappings/${id}`, { method: 'DELETE' });
 export const setOrgApiKey = (key: string) =>
   request<{ hasApiKey: boolean; apiKeyLast4: string }>('/api/v1/org/api-key', json('PUT', { key }));
 export const clearOrgApiKey = () =>
@@ -88,10 +106,17 @@ export const adminCreateOrg = (name: string) =>
 export const adminSetOrgStatus = (id: string, status: string) =>
   request<{ id: string; status: string }>(`/api/v1/admin/orgs/${id}`, json('PATCH', { status }));
 
-export function uploadRun(file: File, dryRun: boolean): Promise<{ runId: string }> {
+export function uploadRun(
+  file: File, dryRun: boolean,
+  opts?: { mapping?: CsvMappingSpec; saveMapping?: boolean },
+): Promise<{ runId: string }> {
   const body = new FormData();
   body.append('file', file);
   body.append('dry_run', String(dryRun));
+  if (opts?.mapping) {
+    body.append('mapping', JSON.stringify(opts.mapping));
+    body.append('save_mapping', String(opts.saveMapping ?? false));
+  }
   return request('/api/v1/runs', { method: 'POST', body });
 }
 
