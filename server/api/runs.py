@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from server.api.deps import OrgContext, current_org, get_session, scoped_run
 from server.api.org import upsert_csv_mapping
 from server.ingest import apply_mapping
-from server.models import AuditEvent, Claim, Run
+from server.models import AuditEvent, Claim, Run, utcnow
 from server.payloads import audit_entries, letter_markdown, run_payload, worklist_payload
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -48,6 +48,8 @@ async def create_run(
             mapping_obj = json.loads(mapping)
         except json.JSONDecodeError as exc:
             raise HTTPException(422, detail=f"mapping is not valid JSON: {exc}")
+        if not isinstance(mapping_obj, dict):
+            raise HTTPException(422, detail="mapping must be a JSON object of {field: column}")
         reader = csv.DictReader(io.StringIO(text))
         headers = reader.fieldnames or []
         rows = list(reader)
@@ -114,7 +116,6 @@ async def create_run(
             denial_reason_text=r.denial_reason_text,
         ))
     if import_notes:
-        from server.models import utcnow
         session.add(AuditEvent(
             run_id=run.id, ts=utcnow(), event_type="csv_import_notes",
             details={"count": len(import_notes),

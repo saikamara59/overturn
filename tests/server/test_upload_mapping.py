@@ -78,6 +78,18 @@ def test_invalid_mapping_422(client, session_factory):
     assert r2.status_code == 422
 
 
+def test_non_object_mapping_422(client, session_factory):
+    setup_org(client, session_factory)
+    for raw in ('null', '[]', '"hello"'):
+        r = client.post(
+            "/api/v1/runs",
+            files={"file": ("x.csv", io.BytesIO(MESSY_CSV.encode()), "text/csv")},
+            data={"dry_run": "true", "mapping": raw},
+        )
+        assert r.status_code == 422, raw
+        assert "mapping" in str(r.json()["detail"]), raw
+
+
 def test_save_mapping_upserts(client, session_factory):
     setup_org(client, session_factory)
     assert upload_mapped(client, save=True).status_code == 202
