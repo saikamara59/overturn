@@ -33,3 +33,34 @@ test('upload → draft → approve → persists across reload', async ({ page })
   await page.getByText('CLM-E2E-1').click();
   await expect(page.getByText('Submitted').first()).toBeVisible();
 });
+
+test('multi-tenant onboarding: provision org → invite → isolated workspace', async ({ page, browser }) => {
+  // platform admin provisions a new org
+  await page.goto('/');
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await page.getByLabel(/email/i).fill(process.env.E2E_EMAIL ?? 'admin@example.com');
+  await page.getByLabel(/password/i).fill(process.env.E2E_PASSWORD ?? 'change-me-locally');
+  await page.getByRole('button', { name: /log in/i }).click();
+  await page.getByRole('button', { name: 'Admin' }).click();
+
+  const orgName = `E2E Org ${Date.now()}`;
+  await page.getByLabel(/organization name/i).fill(orgName);
+  await page.getByRole('button', { name: /create org/i }).click();
+  const inviteUrl = await page
+    .locator('input[readonly]').first().inputValue();
+  expect(inviteUrl).toContain('#/invite/');
+
+  // new user accepts in a fresh browser context (separate cookies)
+  const ctx = await browser.newContext();
+  const invitee = await ctx.newPage();
+  await invitee.goto(inviteUrl);
+  await invitee.getByLabel(/email/i).fill(`founder-${Date.now()}@e2e.test`);
+  await invitee.getByLabel(/password/i).fill('freshpw123');
+  await invitee.getByRole('button', { name: /join/i }).click();
+
+  // lands in an empty, isolated org
+  await expect(invitee.getByText('Runs', { exact: true })).toBeVisible();
+  await expect(invitee.getByText(orgName)).toBeVisible();
+  await expect(invitee.getByText(/No runs yet/)).toBeVisible();
+  await ctx.close();
+});

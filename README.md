@@ -143,6 +143,7 @@ docker compose up -d db
 .venv/bin/pip install -e ".[dev,server]"
 DATABASE_URL=postgresql+psycopg://overturn:overturn@localhost:5433/overturn \
   ADMIN_EMAIL=a@b.c ADMIN_PASSWORD=pw SECRET_KEY=dev \
+  KEY_ENCRYPTION_SECRET=$(.venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())") \
   .venv/bin/uvicorn server.app:app --reload &
 DATABASE_URL=... .venv/bin/python -m server.worker &
 cd frontend && npm run dev:app   # Vite dev server proxying /api
@@ -152,8 +153,16 @@ Deploy (Railway): create a project with a Postgres plugin and two services
 from this repo's Dockerfile — **web** (default) and **worker** (set
 `SERVICE_ROLE=worker`; the image's CMD dispatches on it). Set on both:
 `DATABASE_URL` (from the plugin), `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
-`SECRET_KEY`, `ANTHROPIC_API_KEY` (optional — dry runs work without it),
-`MAX_UPLOAD_RECORDS` (default 200), `DEMO_MODE` (default 1), `SECURE_COOKIES`
-(default 0 — recommend setting to 1 in production so session cookies are
-sent `https_only`). Migrations run automatically when the web service
-starts.
+`SECRET_KEY`, `KEY_ENCRYPTION_SECRET` (required — a urlsafe-base64 32-byte
+Fernet key, generate with the command above; encrypts each org's stored
+Anthropic API key), `ANTHROPIC_API_KEY` (optional — dry runs work without
+it), `MAX_UPLOAD_RECORDS` (default 200), `DEMO_MODE` (default 1),
+`SECURE_COOKIES` (default 0 — recommend setting to 1 in production so
+session cookies are sent `https_only`). Migrations run automatically when
+the web service starts.
+
+Multi-tenancy (Phase 2): the platform admin (`ADMIN_EMAIL`) provisions
+organizations from the Admin screen and shares single-use invite links.
+Each org brings its own Anthropic API key (stored encrypted with
+`KEY_ENCRYPTION_SECRET`); orgs without a key run dry-run only. Data is
+isolated per org.

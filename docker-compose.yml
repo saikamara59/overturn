@@ -19,6 +19,7 @@ services:
       ADMIN_EMAIL: admin@example.com
       ADMIN_PASSWORD: change-me-locally
       SECRET_KEY: dev-secret-not-for-prod
+      KEY_ENCRYPTION_SECRET: oqgBLTRm2012PjCSH6iMHTnRynkFSBjH88ZKjZ1RgWY=
       DEMO_MODE: "1"
       # ANTHROPIC_API_KEY: set in your shell to enable live runs
     depends_on:
