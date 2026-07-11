@@ -61,4 +61,14 @@ app = None  # populated lazily for uvicorn: `uvicorn server.app:app --factory` n
 try:  # pragma: no cover - production path only
     app = build_app()
 except Exception:  # missing env in dev/test contexts is fine; tests use create_app
+    import sys
+    import traceback
+
+    traceback.print_exc()
+    print(
+        "FATAL: server configuration invalid — app failed to build; see the "
+        "error above (likely missing/invalid environment variables). "
+        "`server.app:app` is None and every request will fail until fixed.",
+        file=sys.stderr,
+    )
     app = None
