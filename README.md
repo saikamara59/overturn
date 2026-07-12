@@ -1,5 +1,7 @@
 # Overturn
 
+![ci](https://github.com/saikamara59/overturn/actions/workflows/ci.yml/badge.svg)
+
 Overturn is a provider-side denial management CLI: it ingests payer denial
 remittances (simplified 835 CSV/JSON), runs each denied claim through the
 [healthflow-agents](https://github.com/saikamara59/healthflow-agents) appeal
@@ -166,3 +168,13 @@ organizations from the Admin screen and shares single-use invite links.
 Each org brings its own Anthropic API key (stored encrypted with
 `KEY_ENCRYPTION_SECRET`); orgs without a key run dry-run only. Data is
 isolated per org.
+
+### CI/CD
+
+Every PR runs three required gates on GitHub Actions: backend (pytest
+against a Postgres service container), frontend (Vitest + both builds +
+a check that the committed workbench template matches `build:template`
+output), and e2e (Playwright against the compose stack). Merges to `main`
+additionally deploy web + worker to Railway (via the `RAILWAY_TOKEN`
+repository secret) and smoke-check the live site. Manual deploys remain
+available with `railway up --service web|worker`.
