@@ -20,10 +20,10 @@ def engine():
         with eng.connect() as conn:
             conn.execute(text("SELECT 1"))
     except OperationalError:
-        pytest.skip(
-            "Postgres unreachable — start it with `docker compose up -d db`",
-            allow_module_level=False,
-        )
+        message = "Postgres unreachable — start it with `docker compose up -d db`"
+        if os.environ.get("CI"):
+            pytest.fail(f"{message} (refusing to skip in CI)", pytrace=False)
+        pytest.skip(message, allow_module_level=False)
     yield eng
     eng.dispose()
 
