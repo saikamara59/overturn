@@ -95,7 +95,3 @@ def test_audit_event_jsonb_details(session_factory):
         ev = s.query(AuditEvent).one()
         assert ev.details["count"] == 2
         assert ev.agent is None
-
-
-def test_ci_gate_negative_check_scratch(session_factory):
-    assert False, "deliberate failure - CI gate negative test, will be reverted"
