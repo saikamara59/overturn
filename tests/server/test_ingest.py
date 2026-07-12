@@ -47,6 +47,9 @@ class TestNormalizers:
         ("50", "CO", "CO-50", False),
         ("204", "pr", "PR-204", False),
         ("50", None, "CO-50", True),          # bare code -> CO + note
+        ("B7", "CO", "CO-B7", False),
+        ("b7", None, "CO-B7", True),          # bare alnum code -> CO + note
+        ("P13", "OA", "OA-P13", False),
     ])
     def test_carc(self, code, group, expected, has_note):
         canonical, note = normalize_carc(code, group)

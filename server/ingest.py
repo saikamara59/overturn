@@ -128,7 +128,7 @@ def normalize_amount(s: str) -> float:
 
 def normalize_carc(code: str, group: str | None = None) -> tuple[str, str | None]:
     raw = code.strip().upper()
-    match = re.fullmatch(r"(?:(CO|PR|OA|PI|CR)[\s-]?)?(\d{1,3})", raw)
+    match = re.fullmatch(r"(?:(CO|PR|OA|PI|CR)[\s-]?)?([A-Z]?\d{1,3})", raw)
     if match is None:
         raise ValueError(f"could not parse CARC code {code!r}")
     embedded_group, number = match.group(1), match.group(2)
