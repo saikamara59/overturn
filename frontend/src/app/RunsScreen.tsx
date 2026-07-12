@@ -107,6 +107,9 @@ export function RunsScreen({ onOpenRun }: { onOpenRun: (id: string) => void }) {
     setRowErrors(null);
     try {
       await uploadRun(file, dryRun, activeMapping ? { mapping: activeMapping, saveMapping } : undefined);
+      if (activeMapping && saveMapping) {
+        listCsvMappings().then(setSavedMappings).catch(() => {});
+      }
       if (fileRef.current) fileRef.current.value = '';
       resetStaged();
       await refresh();
