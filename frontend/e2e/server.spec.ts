@@ -83,3 +83,43 @@ test('multi-tenant onboarding: provision org → invite → isolated workspace',
   await expect(invitee.getByText(/No runs yet/)).toBeVisible();
   await ctx.close();
 });
+
+const MESSY_CSV = `Claim Number,Carrier,Adj Group,Reason Code,Remark Codes,Denial Reason,Total Charges,DOS,Check Date,Batch ${Date.now()}
+CLM-MAP-${Date.now()}-1,Acme Ins,CO,50,N115,Not medically necessary,"$12,500.00",04/10/2026,05/01/2026,batch-a
+CLM-MAP-${Date.now()}-2,Acme Ins,PR,204,,Plan exclusion,430.25,03/02/2026,04/15/2026,batch-a
+`;
+
+test('messy CSV maps, imports with deadline rule, and remembers the mapping', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await page.getByLabel(/email/i).fill(process.env.E2E_EMAIL ?? 'admin@example.com');
+  await page.getByLabel(/password/i).fill(process.env.E2E_PASSWORD ?? 'change-me-locally');
+  await page.getByRole('button', { name: /log in/i }).click();
+
+  // unique per run: the dev DB is never cleaned between test runs, so a
+  // fixed filename would let `.first()` below match a stale completed row
+  // from an earlier run before this run's own row ever appears.
+  const filename = `waystar-export-${Date.now()}.csv`;
+  const upload = async () => {
+    await page.setInputFiles('input[type=file]', {
+      name: filename, mimeType: 'text/csv',
+      buffer: Buffer.from(MESSY_CSV),
+    });
+  };
+
+  // first upload: mapping panel appears with suggestions pre-filled
+  await upload();
+  await expect(page.getByText('Map your columns')).toBeVisible();
+  await expect(page.getByLabel('Claim ID')).toHaveValue('Claim Number');
+  await expect(page.getByText(/denial date \+ \d+ days/)).toBeVisible();
+  await page.getByRole('button', { name: /use this mapping/i }).click();
+  await page.getByRole('button', { name: /upload/i }).click();
+
+  const row = page.locator('.audit-row', { hasText: filename }).first();
+  await expect(row.getByText('completed')).toBeVisible({ timeout: 90_000 });
+
+  // second upload of the same shape: saved mapping badge, no panel
+  await upload();
+  await expect(page.getByText(/using saved mapping/i)).toBeVisible();
+  await expect(page.getByText('Map your columns')).not.toBeVisible();
+});

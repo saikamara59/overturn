@@ -1,8 +1,11 @@
+import csv
 import io
+import json
 import uuid
 import zipfile
 from datetime import date
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from healthflow_agents.tools.remittance_parser import (
@@ -14,7 +17,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from server.api.deps import OrgContext, current_org, get_session, scoped_run
-from server.models import AuditEvent, Claim, Run
+from server.api.org import upsert_csv_mapping
+from server.ingest import apply_mapping
+from server.models import AuditEvent, Claim, Run, utcnow
 from server.payloads import audit_entries, letter_markdown, run_payload, worklist_payload
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -25,6 +30,8 @@ async def create_run(
     request: Request,
     file: UploadFile = File(...),
     dry_run: bool = Form(False),
+    mapping: Optional[str] = Form(None),
+    save_mapping: bool = Form(False),
     session: Session = Depends(get_session),
     ctx: OrgContext = Depends(current_org),
 ) -> dict:
@@ -34,14 +41,44 @@ async def create_run(
         raise HTTPException(415, detail=f"unsupported file type {suffix!r} (use .csv or .json)")
 
     text = (await file.read()).decode("utf-8", errors="replace")
-    try:
-        records = (
-            parse_remittance_csv(text) if suffix == ".csv" else parse_remittance_json(text)
-        )
-    except RemittanceParseError as exc:
-        raise HTTPException(422, detail=str(exc))
-    except ValueError as exc:  # includes json.JSONDecodeError
-        raise HTTPException(422, detail=f"could not parse file: {exc}")
+    if mapping is not None:
+        if suffix != ".csv":
+            raise HTTPException(422, detail="mapping applies to CSV uploads only")
+        try:
+            mapping_obj = json.loads(mapping)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(422, detail=f"mapping is not valid JSON: {exc}")
+        if not isinstance(mapping_obj, dict):
+            raise HTTPException(422, detail="mapping must be a JSON object of {field: column}")
+        reader = csv.DictReader(io.StringIO(text))
+        headers = reader.fieldnames or []
+        rows = list(reader)
+        try:
+            mapped = apply_mapping(
+                headers, rows, mapping_obj,
+                default_appeal_days=ctx.org.default_appeal_days,
+            )
+        except ValueError as exc:
+            raise HTTPException(422, detail=str(exc))
+        if mapped.errors:
+            raise HTTPException(422, detail={
+                "errors": [e.as_dict() for e in mapped.errors[:20]],
+                "totalErrors": len(mapped.errors),
+            })
+        records = mapped.records
+        import_notes = mapped.notes
+        if save_mapping:
+            upsert_csv_mapping(session, ctx.org.id, headers, mapping_obj)
+    else:
+        import_notes = []
+        try:
+            records = (
+                parse_remittance_csv(text) if suffix == ".csv" else parse_remittance_json(text)
+            )
+        except RemittanceParseError as exc:
+            raise HTTPException(422, detail=str(exc))
+        except ValueError as exc:  # includes json.JSONDecodeError
+            raise HTTPException(422, detail=f"could not parse file: {exc}")
     if not records:
         raise HTTPException(422, detail="file contains no denial records")
     if len(records) > settings.max_upload_records:
@@ -77,6 +114,12 @@ async def create_run(
             billed_amount=r.billed_amount, service_date=r.service_date,
             denial_date=r.denial_date, appeal_deadline=r.appeal_deadline,
             denial_reason_text=r.denial_reason_text,
+        ))
+    if import_notes:
+        session.add(AuditEvent(
+            run_id=run.id, ts=utcnow(), event_type="csv_import_notes",
+            details={"count": len(import_notes),
+                     "notes": [n.as_dict() for n in import_notes[:20]]},
         ))
     return {"runId": str(run.id)}
 

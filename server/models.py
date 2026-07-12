@@ -121,7 +121,30 @@ class Org(Base):
     status: Mapped[str] = mapped_column(default="active")
     anthropic_key_encrypted: Mapped[str | None] = mapped_column(Text, default=None)
     anthropic_key_last4: Mapped[str | None] = mapped_column(String(4), default=None)
+    default_appeal_days: Mapped[int] = mapped_column(default=90)
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+
+class CsvMapping(Base):
+    __tablename__ = "csv_mappings"
+    __table_args__ = (UniqueConstraint("org_id", "header_signature"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("orgs.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(default="Mapping")
+    header_signature: Mapped[str]
+    headers: Mapped[list] = mapped_column(JSONB, default=list)
+    mapping: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+    last_used_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow
     )
 

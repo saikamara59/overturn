@@ -1,22 +1,26 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  clearOrgApiKey, createInvite, getOrg, listInvites, listMembers,
-  removeMember, revokeInvite, setMemberRole, setOrgApiKey,
-  type InviteInfo, type MemberInfo, type OrgInfo,
+  clearOrgApiKey, createInvite, deleteCsvMapping, getOrg, listCsvMappings, listInvites,
+  listMembers, patchOrg, removeMember, revokeInvite, setMemberRole, setOrgApiKey,
+  type InviteInfo, type MemberInfo, type OrgInfo, type SavedCsvMapping,
 } from './api';
 
 export function OrgSettingsScreen({ onBack }: { onBack: () => void }) {
   const [org, setOrg] = useState<OrgInfo | null>(null);
   const [members, setMembers] = useState<MemberInfo[]>([]);
   const [invites, setInvites] = useState<InviteInfo[]>([]);
+  const [mappings, setMappings] = useState<SavedCsvMapping[]>([]);
   const [keyInput, setKeyInput] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
+  const [days, setDays] = useState<number | ''>('');
   const [error, setError] = useState('');
 
   const refresh = useCallback(() => {
-    getOrg().then(setOrg).catch((e) => setError(String(e.message ?? e)));
+    getOrg().then((o) => { setOrg(o); setDays(o.defaultAppealDays); })
+      .catch((e) => setError(String(e.message ?? e)));
     listMembers().then(setMembers).catch(() => {});
     listInvites().then(setInvites).catch(() => {});
+    listCsvMappings().then(setMappings).catch(() => {});
   }, []);
   useEffect(refresh, [refresh]);
 
@@ -58,6 +62,49 @@ export function OrgSettingsScreen({ onBack }: { onBack: () => void }) {
               Remove key
             </button>
           )}
+        </div>
+      </div>
+
+      <div className="panel" style={{ marginTop: 12 }}>
+        <div className="panel-title">Default appeal window</div>
+        <div className="sm-note" style={{ marginTop: 6 }}>
+          When an uploaded file has no appeal-deadline column, deadlines are
+          computed as denial date + this many days.
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'flex-end' }}>
+          <label style={{ fontSize: 12.5, color: 'var(--mut)' }}>
+            Appeal window (days)
+            <input type="number" min={1} max={365} value={days}
+                   onChange={(e) => setDays(e.target.value === '' ? '' : Number(e.target.value))}
+                   style={{ display: 'block', marginTop: 4, padding: '7px 10px', width: 120,
+                            border: '1px solid #DBD8D1', borderRadius: 8, font: 'inherit' }} />
+          </label>
+          <button type="button" className="btn-primary"
+                  onClick={() => typeof days === 'number' && act(patchOrg(days))}>
+            Save window
+          </button>
+        </div>
+      </div>
+
+      <div className="panel" style={{ marginTop: 12 }}>
+        <div className="panel-title">Saved CSV mappings</div>
+        <div style={{ marginTop: 8 }}>
+          {mappings.length === 0 && (
+            <div className="sm-note">No saved mappings yet — they're created
+            when you map an upload and tick "Remember this mapping".</div>
+          )}
+          {mappings.map((m) => (
+            <div key={m.id} className="audit-row" style={{ gap: 12 }}>
+              <div style={{ flex: 1, fontSize: 13 }}>{m.name}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--mut)' }}>
+                {m.headers.length} columns · last used {m.lastUsedAt.slice(0, 10)}
+              </div>
+              <button type="button" className="btn" aria-label="delete mapping"
+                      onClick={() => act(deleteCsvMapping(m.id))}>
+                Delete
+              </button>
+            </div>
+          ))}
         </div>
       </div>
 

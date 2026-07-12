@@ -10,7 +10,8 @@ from server.api.deps import (
     OrgContext, current_org, get_session, require_org_admin,
 )
 from server.crypto import last4
-from server.models import Membership, User
+from server.ingest import header_signature
+from server.models import CsvMapping, Membership, User, utcnow
 
 router = APIRouter(prefix="/org", tags=["org"])
 
@@ -23,6 +24,29 @@ def org_info(ctx: OrgContext = Depends(current_org)) -> dict:
         "role": ctx.role,
         "hasApiKey": ctx.org.anthropic_key_encrypted is not None,
         "apiKeyLast4": ctx.org.anthropic_key_last4,
+        "defaultAppealDays": ctx.org.default_appeal_days,
+    }
+
+
+class OrgPatch(BaseModel):
+    defaultAppealDays: int
+
+
+@router.patch("")
+def patch_org(
+    body: OrgPatch,
+    ctx: OrgContext = Depends(require_org_admin),
+    session: Session = Depends(get_session),
+) -> dict:
+    if not (1 <= body.defaultAppealDays <= 365):
+        raise HTTPException(422, detail="defaultAppealDays must be 1-365")
+    org = session.get(type(ctx.org), ctx.org.id)
+    org.default_appeal_days = body.defaultAppealDays
+    return {
+        "id": str(org.id), "name": org.name, "role": ctx.role,
+        "hasApiKey": org.anthropic_key_encrypted is not None,
+        "apiKeyLast4": org.anthropic_key_last4,
+        "defaultAppealDays": org.default_appeal_days,
     }
 
 
@@ -127,3 +151,50 @@ def remove_member(
         raise HTTPException(409, detail="cannot remove the last admin")
     session.delete(m)
     return {"removed": str(user_id)}
+
+
+def upsert_csv_mapping(session: Session, org_id, headers: list, mapping: dict):
+    sig = header_signature(headers)
+    existing = session.scalars(
+        select(CsvMapping).where(CsvMapping.org_id == org_id,
+                                 CsvMapping.header_signature == sig)
+    ).first()
+    if existing is not None:
+        existing.mapping = mapping
+        existing.last_used_at = utcnow()
+        return existing
+    row = CsvMapping(org_id=org_id, header_signature=sig,
+                     headers=headers, mapping=mapping,
+                     name=f"Mapping ({len(headers)} columns)")
+    session.add(row)
+    session.flush()
+    return row
+
+
+@router.get("/csv-mappings")
+def list_csv_mappings(
+    ctx: OrgContext = Depends(current_org),
+    session: Session = Depends(get_session),
+) -> list[dict]:
+    rows = session.scalars(
+        select(CsvMapping).where(CsvMapping.org_id == ctx.org.id)
+        .order_by(CsvMapping.last_used_at.desc())
+    ).all()
+    return [
+        {"id": str(m.id), "name": m.name, "headers": m.headers,
+         "mapping": m.mapping, "lastUsedAt": m.last_used_at.isoformat()}
+        for m in rows
+    ]
+
+
+@router.delete("/csv-mappings/{mapping_id}")
+def delete_csv_mapping(
+    mapping_id: uuid.UUID,
+    ctx: OrgContext = Depends(require_org_admin),
+    session: Session = Depends(get_session),
+) -> dict:
+    row = session.get(CsvMapping, mapping_id)
+    if row is None or row.org_id != ctx.org.id:
+        raise HTTPException(404, detail="mapping not found")
+    session.delete(row)
+    return {"deleted": str(mapping_id)}
