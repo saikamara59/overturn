@@ -10,6 +10,11 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./docker/db-init.sql:/docker-entrypoint-initdb.d/db-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U overturn"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
   web:
     build: .
     ports:
@@ -23,12 +28,14 @@ services:
       DEMO_MODE: "1"
       # ANTHROPIC_API_KEY: set in your shell to enable live runs
     depends_on:
-      - db
+      db:
+        condition: service_healthy
   worker:
     build: .
     command: python -m server.worker
     environment: *appenv
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 volumes:
   db-data:
