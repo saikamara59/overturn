@@ -17,6 +17,7 @@ interface Props {
   onExport: () => void;
   onDismiss?: (reason?: string) => void;
   onRestore?: () => void;
+  onRegenerate?: () => void;
   dismissReason?: string;
 }
 
@@ -46,6 +47,7 @@ export function DetailScreen(p: Props) {
           onExport={p.onExport}
           onDismiss={p.onDismiss}
           onRestore={p.onRestore}
+          onRegenerate={p.onRegenerate}
           dismissReason={p.dismissReason}
         />
       </div>

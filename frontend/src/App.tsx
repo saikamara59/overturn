@@ -165,6 +165,25 @@ export default function App({
             }).catch((e) => showToast(String((e as Error).message ?? e)));
           } : undefined}
           dismissReason={dismissReasons[claim.id] ?? claim.dismissReason ?? undefined}
+          onRegenerate={
+            mutations?.generate
+              && ['Draft Ready', 'Failed'].includes(effectiveStatus(claim, statusOverrides))
+              ? () => {
+                mutations.generate!([claim]).then(({ queued }) => {
+                  if (queued) {
+                    setLetters((l) => {
+                      const next = { ...l };
+                      delete next[claim.id];
+                      return next;
+                    });
+                    showToast(`${claim.id} queued for regeneration`);
+                  } else {
+                    showToast(`${claim.id} cannot be regenerated right now`);
+                  }
+                }).catch((e) => showToast(String((e as Error).message ?? e)));
+              }
+              : undefined
+          }
         />
       );
     }

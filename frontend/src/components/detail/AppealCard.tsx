@@ -13,6 +13,7 @@ interface Props {
   onExport: () => void;
   onDismiss?: (reason?: string) => void;
   onRestore?: () => void;
+  onRegenerate?: () => void;
   dismissReason?: string;
 }
 
@@ -53,7 +54,9 @@ export function AppealCard(p: Props) {
           <div className="t">No appeal drafted</div>
           <div className="b">
             {p.claim.error ?? 'This record failed during batch processing.'}{' '}
-            Write the appeal manually or re-run the batch for this claim.
+            {p.onRegenerate
+              ? 'Regenerate it below or write the appeal manually.'
+              : 'Write the appeal manually or re-run the batch for this claim.'}
           </div>
         </div>
       ) : (
@@ -80,14 +83,24 @@ export function AppealCard(p: Props) {
             <button type="button" className="btn-primary" onClick={p.onRestore}>Restore</button>
           )
         ) : failed ? (
-          p.onDismiss && !showReason && (
-            <button type="button" className="btn" onClick={() => setShowReason(true)}>Dismiss</button>
-          )
+          <>
+            {p.onRegenerate && (
+              <button type="button" className="btn-primary" onClick={p.onRegenerate}>
+                Regenerate
+              </button>
+            )}
+            {p.onDismiss && !showReason && (
+              <button type="button" className="btn" onClick={() => setShowReason(true)}>Dismiss</button>
+            )}
+          </>
         ) : (
           <>
             <button type="button" className="btn-primary" onClick={p.onApprove}>Approve</button>
             <button type="button" className="btn" onClick={() => textareaRef.current?.focus()}>Edit</button>
             <button type="button" className="btn" onClick={p.onRevert}>Revert draft</button>
+            {p.onRegenerate && (
+              <button type="button" className="btn" onClick={p.onRegenerate}>Regenerate</button>
+            )}
             {p.onDismiss && !showReason && (
               <button type="button" className="btn" onClick={() => setShowReason(true)}>Dismiss</button>
             )}

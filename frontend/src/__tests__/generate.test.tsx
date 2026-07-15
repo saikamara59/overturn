@@ -59,3 +59,23 @@ test('statusStyle covers the in-flight statuses', () => {
   expect(statusStyle('Queued').cls).toBe('c-gray');
   expect(statusStyle('Drafting').cls).toBe('c-amber');
 });
+
+test('detail shows Regenerate in server mode and regen queues the claim', async () => {
+  const data = makeData();
+  const generate = vi.fn().mockResolvedValue({ queued: 1, skipped: 0 });
+  render(<App data={data} mutations={mutationsWith(generate)} />);
+
+  fireEvent.click(document.querySelector('.tbody-row') as HTMLElement);
+  fireEvent.click(screen.getByRole('button', { name: 'Regenerate' }));
+
+  await waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
+  expect(generate.mock.calls[0][0]).toHaveLength(1);
+  await screen.findByText(/queued for regeneration/);
+});
+
+test('detail has no Regenerate in static mode', () => {
+  const data = makeData();
+  render(<App data={data} />);
+  fireEvent.click(document.querySelector('.tbody-row') as HTMLElement);
+  expect(screen.queryByRole('button', { name: 'Regenerate' })).toBeNull();
+});
