@@ -40,6 +40,11 @@ button { font-family: inherit; cursor: pointer; }
   .topbar-meta { display: none; }
 }
 
+/* ---- app chrome (served SPA) ---- */
+.app-chrome { display: flex; align-items: center; gap: 12px; padding: 8px 20px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.app-chrome .org { font-weight: 650; }
+.demo-banner { display: flex; align-items: center; gap: 12px; padding: 10px 20px; background: var(--amber-bg); color: var(--amber-fg); font-size: 12.5px; font-weight: 600; }
+
 /* ---- chips / pills ---- */
 .pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .st { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
@@ -205,4 +210,7 @@ button.th:hover { color: var(--ink); }
   .detail { padding: 12px 12px 24px; }
   .sm-inner { padding: 16px 12px 28px; }
   .sm-cards { grid-template-columns: repeat(2, 1fr); }
+  .app-chrome, .demo-banner { flex-wrap: wrap; row-gap: 8px; padding-left: 12px; padding-right: 12px; }
+  .audit-row { flex-wrap: wrap; row-gap: 4px; }
+  .audit-detail { white-space: normal; }
 }

@@ -107,8 +107,7 @@ export function ServerApp() {
     }
     return (
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px',
-                      background: 'var(--amber-bg)', color: 'var(--amber-fg)', fontSize: 12.5, fontWeight: 600 }}>
+        <div className="demo-banner">
           Read-only demo — synthetic data only.
           <div className="spacer" />
           <button type="button" className="btn" onClick={() => setShowLogin(true)}>Sign in</button>
@@ -120,10 +119,8 @@ export function ServerApp() {
 
   const chrome = (body: JSX.Element) => (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '8px 20px', borderBottom: '1px solid var(--line)',
-                    fontSize: 12.5 }}>
-        <span style={{ fontWeight: 650 }}>{user.orgName}</span>
+      <div className="app-chrome">
+        <span className="org">{user.orgName}</span>
         <div className="spacer" />
         {user.role === 'admin' && (
           <button type="button" className="btn"
@@ -145,12 +142,11 @@ export function ServerApp() {
   if (route.name === 'run') {
     return (
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 20px',
-                      borderBottom: '1px solid var(--line)', fontSize: 12.5 }}>
+        <div className="app-chrome">
           <button type="button" className="backlink" onClick={() => { window.location.hash = ''; }}>
             ← Runs
           </button>
-          <span style={{ fontWeight: 650 }}>{user.orgName}</span>
+          <span className="org">{user.orgName}</span>
           {runActive && <span className="pill c-amber">drafting in progress — refreshing</span>}
           <div className="spacer" />
           <button type="button" className="btn"
