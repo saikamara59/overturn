@@ -2,23 +2,66 @@
 
 ![ci](https://github.com/saikamara59/overturn/actions/workflows/ci.yml/badge.svg)
 
-Overturn is a provider-side denial management CLI: it ingests payer denial
-remittances (simplified 835 CSV/JSON), runs each denied claim through the
-[healthflow-agents](https://github.com/saikamara59/healthflow-agents) appeal
-engine — PHI redaction, CARC/RARC code lookup, appeal-letter drafting, and
-Claude-refined appeal recommendations — and produces a deadline-prioritized
-worklist so an RCM team works the most urgent, highest-dollar appeals first.
-Overturn itself is a thin adapter: transport, config, and presentation only.
-All agent logic, redaction, safety behavior, and data contracts live in the
-healthflow-agents package.
+**AI-assisted denial management for medical billing teams.** Overturn turns
+payer denial remittances into a deadline-prioritized appeal worklist with
+Claude-drafted appeal letters — so billers work the most urgent,
+highest-dollar denials first and ship researched appeals in minutes instead
+of half an hour each.
+
+**Live demo:** https://overturn.up.railway.app — no signup needed; the
+public view is a read-only workbench over 50 synthetic denials.
 
 > **Demonstration system.** Overturn is not production RCM software. It ships
-> with a synthetic-data generator and must only be run on synthetic data —
-> real PHI must not be processed outside a BAA-covered deployment.
+> with a synthetic-data generator and must only be run on synthetic or
+> de-identified data — real PHI must not be processed outside a BAA-covered
+> deployment.
+
+## The problem
+
+When an insurer denies a claim, the money usually isn't gone — most denials
+are appealable, and appeals succeed often enough to be worth filing. But
+writing one appeal means decoding CARC/RARC denial codes, finding the
+regulatory counter-argument, and drafting a formal letter under a 30–90 day
+deadline. Teams facing hundreds of denials cherry-pick a few and write off
+the rest. Overturn exists to let the same team work the whole list.
+
+## What it does
+
+- **Upload real clearinghouse exports unchanged** — unknown CSV columns get
+  an auto-suggested mapping (saved per organization), values are normalized
+  (`$12,500.00`, `04/10/2026`, split CARC group/code columns), and missing
+  appeal deadlines are computed from a per-org rule.
+- **Deadline-first triage** — the worklist sorts by appeal deadline, then
+  dollars at stake; overdue claims are flagged in red.
+- **AI-drafted appeals, human-approved** — each denial gets a letter built
+  from a curated CARC database (real CMS citations) plus a Claude-refined
+  recommendation. Patient identifiers are redacted *before* any text
+  reaches the model. Nothing is auto-submitted: a biller reviews, edits,
+  and clicks Approve — or Dismisses with a reason, reversibly.
+- **Multi-tenant** — the platform admin provisions organizations and shares
+  single-use invite links; every org's data is hard-isolated, and each org
+  brings its own Anthropic API key (Fernet-encrypted at rest), so AI costs
+  bill to the tenant.
+- **Complete audit trail** — every redaction, model call, draft, dismissal,
+  and approval is recorded per run and visible in the workbench.
+
+## Screenshots
+
+The Denial Workbench — prioritized worklist, claim detail with the drafted
+appeal, and batch summary:
+
+![Denial Workbench — prioritized worklist](docs/workbench-worklist.png)
+
+![Denial Workbench — claim detail with drafted appeal](docs/workbench-detail.png)
+
+![Denial Workbench — batch summary](docs/workbench-summary.png)
 
 ## Architecture
 
-Overturn is one of two thin hosts over a shared agent package:
+Overturn is a **thin host** over a shared agent package — all appeal logic,
+PHI redaction, prompts, and data contracts live in
+[healthflow-agents](https://github.com/saikamara59/healthflow-agents);
+Overturn owns transport, persistence, and presentation only:
 
 ```
                 ┌─────────────────────────┐
@@ -30,17 +73,52 @@ Overturn is one of two thin hosts over a shared agent package:
               ▼                            ▼
       ┌───────────────┐            ┌───────────────┐
       │  healthflow   │            │   overturn    │
-      │ (patient-side │            │ (provider-side│
-      │    web app)   │            │     CLI)      │
+      │ (patient-side │            │  CLI + SaaS   │
+      │    web app)   │            │  (this repo)  │
       └───────────────┘            └───────────────┘
 ```
 
-Both hosts inject their own implementations of the package's logging
-protocols; Overturn's are JSONL file writers (`audit.jsonl` in each run's
-output directory), demonstrating that the injection pattern works with a
-second real implementation.
+Inside this repo:
 
-## Quickstart
+- **`overturn/`** — the original CLI (`run` / `demo` / `summary` /
+  `report`), which renders a fully self-contained single-file HTML
+  workbench from any batch.
+- **`server/`** — FastAPI web service + background worker sharing Postgres.
+  **Postgres is the job queue** (`FOR UPDATE SKIP LOCKED`); the claims
+  table doubles as a per-record checkpoint, so a crashed batch resumes
+  without re-spending API calls.
+- **`frontend/`** — one React 18 + TypeScript codebase with two build
+  targets: the served SPA and the static report template embedded in the
+  CLI (committed, so pip users never need Node).
+- The package's logging interfaces are injected with three real
+  implementations (stdout, JSONL files, Postgres) — the same agents run
+  unchanged in every host.
+
+**Stack:** Python / FastAPI / SQLAlchemy / Alembic / Postgres · React 18 /
+TypeScript / Vite · Claude (Anthropic API) · Docker · Railway · GitHub
+Actions.
+
+## Engineering practices
+
+- **~230 automated tests** across three layers: 155 pytest (API, worker,
+  tenant isolation, ingestion engine — run against real Postgres), 69
+  Vitest component/unit tests, and Playwright end-to-end flows (upload →
+  background drafting → approval persisting across reload; multi-tenant
+  onboarding; messy-CSV mapping).
+- **CI/CD:** every PR runs backend, frontend, and E2E gates; merges to
+  `main` auto-deploy web + worker to Railway and smoke-check the live
+  site. The template build is verified in-sync on every PR.
+- **Tenant isolation as a tested invariant:** cross-org access always
+  returns 404 (never leaking existence), enforced by scoped dependencies
+  and covered by a dedicated adversarial test suite.
+- **Secrets hygiene:** org API keys are Fernet-encrypted under a deploy
+  secret and surface only as a last-4 hint; sessions are signed cookies;
+  misconfiguration fails loudly at boot with the offending variable named.
+- **Spec-first workflow:** every feature in `docs/superpowers/specs/` and
+  `docs/superpowers/plans/`, mirrored to Linear, implemented via
+  test-driven tasks with independent review gates.
+
+## Quickstart (CLI)
 
 ```bash
 pip install "git+https://github.com/saikamara59/overturn"   # or: pip install -e .
@@ -53,14 +131,7 @@ drafting → prioritization), and prints the worklist plus one sample appeal
 letter. Pass `--live` (with `ANTHROPIC_API_KEY` set) to add real Claude
 refinement.
 
-### Sample output
-
-The Denial Workbench rendered from a 50-record synthetic batch
-(`overturn run` → `overturn report`):
-
-![Denial Workbench — prioritized worklist](docs/workbench-worklist.png)
-
-## Commands
+## CLI commands
 
 ```bash
 # Full pipeline over a remittance file (requires ANTHROPIC_API_KEY,
@@ -73,18 +144,6 @@ overturn summary results/worklist.json
 # Interactive HTML Denial Workbench from a prior run (self-contained file):
 overturn report results/ --open
 ```
-
-`overturn report` renders the run into a single-file web workbench: a
-filterable, sortable worklist; a claim-detail view showing the parsed denial
-(CARC/RARC codes, redaction boundary) beside the editable drafted appeal
-letter with export; and a batch-summary view with dollars-at-stake by CARC,
-deadline distribution, and the full audit trail from `audit.jsonl`. Letter
-edits and approvals in the workbench are session-local working state — the
-files on disk are not modified.
-
-![Denial Workbench — claim detail with drafted appeal](docs/workbench-detail.png)
-
-![Denial Workbench — batch summary](docs/workbench-summary.png)
 
 `overturn run` writes to the output directory:
 
@@ -99,7 +158,8 @@ the top, unknown deadlines last), then billed amount descending.
 ## Development
 
 ```bash
-python -m venv .venv && .venv/bin/pip install -e ".[dev]"
+python -m venv .venv && .venv/bin/pip install -e ".[dev,server]"
+docker compose up -d db     # server tests need Postgres (they skip without it)
 .venv/bin/pytest
 ```
 
@@ -108,28 +168,24 @@ injection point; no network access or API key is required.
 
 ### Frontend (Denial Workbench)
 
-The HTML workbench template is built from a React + TypeScript app in
-`frontend/`. The built single-file template is committed at
+The workbench UI is a React + TypeScript app in `frontend/` with two build
+targets. The static template is committed at
 `overturn/templates/workbench.html`, so Python users never need Node.
-
-To change the workbench UI:
 
 ```bash
 cd frontend
 npm install
-npm run dev             # hot-reload dev server with a synthetic fixture
+npm run dev             # static-report mode with a synthetic fixture
+npm run dev:app         # SPA mode, proxying /api to localhost:8000
 npm test                # Vitest + React Testing Library
-npm run build:template  # build and install overturn/templates/workbench.html
+npm run build:template  # build and install the committed template
+npm run build:app       # build the served SPA
 ```
 
-Commit the rebuilt template together with the frontend source change.
+Commit the rebuilt template together with frontend source changes (CI
+enforces this).
 
-### Server (Denial Workbench as a web app)
-
-Phase 1 single-tenant server: upload a remittance in the browser, appeals
-draft in the background, and the workbench persists approvals and letter
-edits. Synthetic data only — do not upload real PHI; this is a demonstration
-system and deployments are not BAA-covered.
+### Server (the SaaS)
 
 Local stack (API + worker + Postgres):
 
@@ -142,39 +198,33 @@ Development without Docker:
 
 ```bash
 docker compose up -d db
-.venv/bin/pip install -e ".[dev,server]"
 DATABASE_URL=postgresql+psycopg://overturn:overturn@localhost:5433/overturn \
   ADMIN_EMAIL=a@b.c ADMIN_PASSWORD=pw SECRET_KEY=dev \
   KEY_ENCRYPTION_SECRET=$(.venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())") \
   .venv/bin/uvicorn server.app:app --reload &
 DATABASE_URL=... .venv/bin/python -m server.worker &
-cd frontend && npm run dev:app   # Vite dev server proxying /api
+cd frontend && npm run dev:app
 ```
 
-Deploy (Railway): create a project with a Postgres plugin and two services
-from this repo's Dockerfile — **web** (default) and **worker** (set
-`SERVICE_ROLE=worker`; the image's CMD dispatches on it). Set on both:
-`DATABASE_URL` (from the plugin), `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
-`SECRET_KEY`, `KEY_ENCRYPTION_SECRET` (required — a urlsafe-base64 32-byte
-Fernet key, generate with the command above; encrypts each org's stored
-Anthropic API key), `ANTHROPIC_API_KEY` (optional — dry runs work without
-it), `MAX_UPLOAD_RECORDS` (default 200), `DEMO_MODE` (default 1),
-`SECURE_COOKIES` (default 0 — recommend setting to 1 in production so
-session cookies are sent `https_only`). Migrations run automatically when
-the web service starts.
+Deploy (Railway): a Postgres plugin and two services from this repo's
+Dockerfile — **web** (default) and **worker** (set `SERVICE_ROLE=worker`;
+the image's CMD dispatches on it). Env on both: `DATABASE_URL`,
+`ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SECRET_KEY`, `KEY_ENCRYPTION_SECRET`
+(required — a urlsafe-base64 32-byte Fernet key; encrypts each org's stored
+Anthropic API key), `MAX_UPLOAD_RECORDS` (default 200), `DEMO_MODE`
+(default 1), `SECURE_COOKIES` (set to 1 in production). Migrations run
+automatically when the web service starts.
 
-Multi-tenancy (Phase 2): the platform admin (`ADMIN_EMAIL`) provisions
-organizations from the Admin screen and shares single-use invite links.
-Each org brings its own Anthropic API key (stored encrypted with
-`KEY_ENCRYPTION_SECRET`); orgs without a key run dry-run only. Data is
-isolated per org.
+Multi-tenancy: the platform admin (`ADMIN_EMAIL`) provisions organizations
+from the Admin screen and shares single-use invite links. Each org brings
+its own Anthropic API key (stored encrypted); orgs without a key run
+dry-run only. Data is isolated per org.
 
 ### CI/CD
 
 Every PR runs three required gates on GitHub Actions: backend (pytest
-against a Postgres service container), frontend (Vitest + both builds +
-a check that the committed workbench template matches `build:template`
-output), and e2e (Playwright against the compose stack). Merges to `main`
-additionally deploy web + worker to Railway (via the `RAILWAY_TOKEN`
-repository secret) and smoke-check the live site. Manual deploys remain
-available with `railway up --service web|worker`.
+against a Postgres service container), frontend (Vitest + both builds + the
+committed-template sync check), and e2e (Playwright against the compose
+stack). Merges to `main` additionally deploy web + worker to Railway (via
+the `RAILWAY_TOKEN` repository secret) and smoke-check the live site.
+Manual deploys remain available with `railway up --service web|worker`.
