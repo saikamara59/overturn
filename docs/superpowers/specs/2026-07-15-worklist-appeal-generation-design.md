@@ -35,6 +35,11 @@ them.** No healthflow-agents change.
 cross-org is 404), body `{"claimIds": ["<claim db uuid>", ...]}`:
 
 - **409** if the run is the demo run.
+- **409** if the run is currently `running` — the worker holds that run's
+  counters in memory mid-pass (`expire_on_commit=False`), so a concurrent
+  requeue would let its per-claim commits clobber the recompute below, and
+  flipping a running run back to `queued` could double-claim it under
+  multiple workers. Queued/completed/failed runs are safe to requeue.
 - **422** if `claimIds` is empty, or contains ids not belonging to this run.
 - **422** if the run is live (`dry_run=False`) and the org currently has no
   API key ("organization has no API key configured; add a key in Org
@@ -73,21 +78,23 @@ cross-org is 404), body `{"claimIds": ["<claim db uuid>", ...]}`:
   **Generate Appeals** (design's CTA) with "Export letters" demoted to a
   secondary `.btn`; in the static report (no mutations) the bulk bar keeps
   Export as primary — a static file can't call an LLM. After a successful
-  call: clear selection, drop local letter overrides for the queued claims,
-  toast `Appeal generation queued for N claims` (append
-  `· M skipped` when M > 0).
+  call: clear selection, drop local letter overrides for the *eligible*
+  (actually queued) claims only, and only when something was queued; cancel
+  any pending letter autosave; toast `Appeal generation queued for N claims`
+  (append `· M skipped` when M > 0).
 - **Detail / AppealCard**: a **Regenerate** button (server mode only) for
   `Draft Ready` and `Failed` claims — on the failed branch it is the
   primary action (this is the fix the banner was asking for; banner copy
-  becomes "Write the appeal manually or regenerate it."). Calls
+  becomes "Regenerate it below or write the appeal manually."). Calls
   `generate([claim])`, toasts, clears that claim's local letter override;
   the poll refresh brings in the new draft.
 - **Status pills**: add `Queued` (gray) and `Drafting` (amber) to
   `statusStyle` so in-flight claims read clearly in the table, cards, and
   detail while polling refreshes.
-- Claims whose status is `Queued`/`Drafting` are not letter-editable
-  (server already 409s letter patches outside draft_ready/submitted; the
-  autosave path tolerates the error via its existing toast).
+- Claims whose status is `Queued`/`Drafting` render a passive "Drafting in
+  progress" banner in detail instead of the editable letter and draft
+  actions (the server independently 409s any letter patch outside
+  draft_ready/submitted).
 
 ## Testing
 

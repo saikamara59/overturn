@@ -28,6 +28,11 @@ test('worklist Generate Appeals and detail Regenerate re-draft claims', async ({
   await expect(page.getByText(/Appeal generation queued for 2 claims/)).toBeVisible();
   await expect(page.locator('.table-card .st', { hasText: 'Draft Ready' })).toHaveCount(2, { timeout: 90_000 });
 
+  // the requeue really happened server-side: audit trail records it
+  await page.getByRole('button', { name: 'Batch Summary' }).click();
+  await expect(page.getByText('regeneration_requested').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Worklist', exact: true }).click();
+
   // detail: Regenerate a single claim
   await page.getByText(`CLM-GEN-${STAMP}-1`).click();
   await page.getByRole('button', { name: 'Regenerate' }).click();

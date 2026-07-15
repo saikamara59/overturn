@@ -9,7 +9,8 @@ export interface Claim {
   denialDate: string;
   deadline: string | null;
   days: number | null;
-  status: 'Draft Ready' | 'Failed';
+  /** Display status from the server (payloads.DISPLAY_STATUS) or the static island. */
+  status: 'Queued' | 'Drafting' | 'Draft Ready' | 'Failed' | 'Submitted' | 'Dismissed';
   denialText: string;
   letter: string | null;
   refined: string | null;

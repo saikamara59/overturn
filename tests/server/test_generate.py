@@ -123,6 +123,22 @@ def test_generate_validation_and_guards(client, session_factory):
                        json={"claimIds": [entries[0]["dbId"]]}).status_code == 409
 
 
+def test_generate_rejects_mid_flight_run(client, session_factory):
+    run_id = drafted_run(client, session_factory)
+    entries = claims_of(client, run_id)
+    with session_factory() as s:
+        s.get(Run, uuid.UUID(run_id)).status = "running"
+        s.commit()
+    r = client.post(f"/api/v1/runs/{run_id}/generate",
+                    json={"claimIds": [entries[0]["dbId"]]})
+    assert r.status_code == 409
+    assert "drafting" in r.json()["detail"]
+    with session_factory() as s:  # nothing was requeued
+        run = s.get(Run, uuid.UUID(run_id))
+        assert run.status == "running"
+        assert all(c.status != "queued" for c in run.claims)
+
+
 def test_generate_cross_org_is_404(client, session_factory):
     run_id = drafted_run(client, session_factory)
     entries = claims_of(client, run_id)

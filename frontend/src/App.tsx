@@ -77,14 +77,19 @@ export default function App({
   };
 
   const onGenerateSelected = mutations?.generate ? () => {
+    clearTimeout(saveTimer.current);
     const sel = data.claims.filter((c) => selected[c.id]);
+    const eligible = sel.filter((c) =>
+      ['Draft Ready', 'Failed'].includes(effectiveStatus(c, statusOverrides)));
     mutations.generate!(sel).then(({ queued, skipped }) => {
       setSelected({});
-      setLetters((l) => {
-        const next = { ...l };
-        sel.forEach((c) => delete next[c.id]);
-        return next;
-      });
+      if (queued > 0) {
+        setLetters((l) => {
+          const next = { ...l };
+          eligible.forEach((c) => delete next[c.id]);
+          return next;
+        });
+      }
       showToast(
         `Appeal generation queued for ${queued} claim${queued === 1 ? '' : 's'}`
         + (skipped ? ` · ${skipped} skipped` : ''),
@@ -169,6 +174,7 @@ export default function App({
             mutations?.generate
               && ['Draft Ready', 'Failed'].includes(effectiveStatus(claim, statusOverrides))
               ? () => {
+                clearTimeout(saveTimer.current);
                 mutations.generate!([claim]).then(({ queued }) => {
                   if (queued) {
                     setLetters((l) => {

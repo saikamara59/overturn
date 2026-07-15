@@ -79,3 +79,40 @@ test('detail has no Regenerate in static mode', () => {
   fireEvent.click(document.querySelector('.tbody-row') as HTMLElement);
   expect(screen.queryByRole('button', { name: 'Regenerate' })).toBeNull();
 });
+
+test('failed claim gets a primary Regenerate and regeneration banner copy', () => {
+  const data = makeData();
+  render(<App data={data} mutations={mutationsWith(vi.fn())} />);
+  fireEvent.click(screen.getByText('CLM-0004')); // Failed fixture claim
+  const regen = screen.getByRole('button', { name: 'Regenerate' });
+  expect(regen.className).toContain('btn-primary');
+  expect(screen.getByText(/Regenerate it below or write the appeal manually/)).toBeInTheDocument();
+});
+
+test('generate clears the local letter override for queued claims', async () => {
+  const data = makeData();
+  const generate = vi.fn().mockResolvedValue({ queued: 1, skipped: 0 });
+  render(<App data={data} mutations={mutationsWith(generate)} />);
+
+  // edit CLM-0001's letter locally, then regenerate it from detail
+  fireEvent.click(screen.getByText('CLM-0001'));
+  const letterBox = document.querySelector('.letter') as HTMLTextAreaElement;
+  fireEvent.change(letterBox, { target: { value: 'my local edit' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Regenerate' }));
+  await screen.findByText(/queued for regeneration/);
+
+  // override is gone: the textarea falls back to the server letter
+  const original = data.claims.find((c) => c.id === 'CLM-0001')!.letter!;
+  expect((document.querySelector('.letter') as HTMLTextAreaElement).value).toBe(original);
+});
+
+test('in-flight claims show a drafting banner instead of draft actions', () => {
+  const data = makeData();
+  data.claims[0].status = 'Queued';
+  render(<App data={data} mutations={mutationsWith(vi.fn())} />);
+  fireEvent.click(screen.getByText(data.claims[0].id));
+  expect(screen.getByText('Drafting in progress')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Regenerate' })).toBeNull();
+  expect(document.querySelector('.letter')).toBeNull();
+});

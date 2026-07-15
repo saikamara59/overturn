@@ -176,6 +176,10 @@ def generate_appeals(
     """Requeue selected claims for (re)drafting; the worker picks them up."""
     if run.is_demo:
         raise HTTPException(409, detail="demo run is read-only")
+    if run.status == "running":
+        # the worker holds this run's counters in memory mid-pass; requeueing
+        # now would let its per-claim commits clobber the recompute below
+        raise HTTPException(409, detail="run is currently drafting — retry when it finishes")
     if not body.claimIds:
         raise HTTPException(422, detail="claimIds must not be empty")
     if not run.dry_run:
