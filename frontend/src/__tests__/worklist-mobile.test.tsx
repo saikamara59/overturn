@@ -34,6 +34,7 @@ test('desktop shows rail + table, no chips or cards', () => {
   expect(document.querySelector('.table-card')).not.toBeNull();
   expect(document.querySelector('.chips')).toBeNull();
   expect(document.querySelector('.claim-card')).toBeNull();
+  expect(document.querySelector('.stat-showing')).not.toBeNull();
 });
 
 test('mobile shows chips + cards, no rail or table', () => {

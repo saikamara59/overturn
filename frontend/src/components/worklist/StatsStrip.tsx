@@ -25,7 +25,7 @@ export function StatsStrip({ data, shownCount }: { data: WorkbenchData; shownCou
         </div>
       </div>
       <div className="spacer" />
-      <div style={{ textAlign: 'right' }}>
+      <div className="stat-showing" style={{ textAlign: 'right' }}>
         <div className="stat-label">Showing</div>
         <div className="shown">
           {shownCount === all.length ? `all ${all.length} claims` : `${shownCount} of ${all.length} claims`}
