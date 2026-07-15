@@ -13,13 +13,16 @@ export function TopBar({ screen, onNavigate, generatedOn, asOf }: Props) {
     <div className="topbar">
       <div className="brand">
         <div className="brand-mark">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF"
-            strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 12a9 9 0 1 0 3-6.7" />
-            <polyline points="3 4 3 9 8 9" />
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M20 12a8 8 0 1 1-3.2-6.4" stroke="#FFFFFF"
+              strokeWidth="3" strokeLinecap="round" />
+            <path d="M17.4 1.6 L16.8 7.3 L22.3 6.1 Z" fill="#FFFFFF" />
           </svg>
         </div>
-        <div className="brand-name">Overturn</div>
+        <div className="brand-text">
+          <div className="brand-name">Overturn<span className="brand-dot">.</span></div>
+          <div className="brand-sub">Denial Workbench</div>
+        </div>
       </div>
       <div className="topbar-rule" />
       <div className="tabs">
