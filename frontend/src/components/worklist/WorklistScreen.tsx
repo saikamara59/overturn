@@ -22,6 +22,7 @@ export interface WorklistProps {
   onToggleAll: () => void;
   onClearSelection: () => void;
   onExportSelected: () => void;
+  onGenerateSelected?: () => void;
   onOpenClaim: (id: string) => void;
   statusOverrides: StatusOverrides;
 }
@@ -60,6 +61,7 @@ export function WorklistScreen(p: WorklistProps) {
             total={selSum}
             onClear={p.onClearSelection}
             onExport={p.onExportSelected}
+            onGenerate={p.onGenerateSelected}
           />
         )}
         {isMobile ? (

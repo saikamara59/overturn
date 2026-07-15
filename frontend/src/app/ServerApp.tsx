@@ -3,7 +3,7 @@ import App, { type WorkbenchMutations } from '../App';
 import type { WorkbenchData } from '../types';
 import { AcceptInviteScreen } from './AcceptInviteScreen';
 import {
-  getDemoClaims, getRun, getRunClaims, logout, me, type MeInfo, patchClaim,
+  generateAppeals, getDemoClaims, getRun, getRunClaims, logout, me, type MeInfo, patchClaim,
 } from './api';
 import { LoginScreen } from './LoginScreen';
 import { OrgSettingsScreen } from './OrgSettingsScreen';
@@ -26,7 +26,7 @@ function parseHash(): Route {
   return m ? { name: 'run', id: m[1] } : { name: 'runs' };
 }
 
-function makeMutations(): WorkbenchMutations {
+function makeMutations(runId: string, onGenerated: () => void): WorkbenchMutations {
   return {
     async approve(c) {
       if (!c.dbId) throw new Error('read-only view');
@@ -48,6 +48,13 @@ function makeMutations(): WorkbenchMutations {
     async restore(c) {
       if (!c.dbId) throw new Error('read-only view');
       return patchClaim(c.dbId, { status: 'restored' });
+    },
+    async generate(claims) {
+      const ids = claims.map((c) => c.dbId).filter(Boolean) as string[];
+      if (!ids.length) throw new Error('read-only view');
+      const out = await generateAppeals(runId, ids);
+      if (out.queued > 0) onGenerated();
+      return out;
     },
   };
 }
@@ -155,7 +162,15 @@ export function ServerApp() {
           </button>
         </div>
         {worklist
-          ? <App data={worklist} mutations={makeMutations()} />
+          ? (
+            <App
+              data={worklist}
+              mutations={makeMutations(route.id, () => {
+                setRunActive(true);
+                loadRun(route.id);
+              })}
+            />
+          )
           : <div className="sm-note" style={{ padding: 24 }}>Loading worklist…</div>}
       </div>
     );

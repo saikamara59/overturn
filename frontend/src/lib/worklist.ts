@@ -30,6 +30,8 @@ export const statusStyle = (s: string): { cls: string; dot: string } =>
     Failed: { cls: 'c-red', dot: 'var(--red-dot)' },
     Submitted: { cls: 'c-green', dot: 'var(--green-dot)' },
     Dismissed: { cls: 'c-gray', dot: 'var(--gray-dot)' },
+    Queued: { cls: 'c-gray', dot: 'var(--gray-dot)' },
+    Drafting: { cls: 'c-amber', dot: 'var(--amber-dot)' },
   })[s] ?? { cls: 'c-gray', dot: 'var(--gray-dot)' };
 
 const daysValue = (c: Claim): number => (c.days === null ? Infinity : c.days);

@@ -124,6 +124,10 @@ export const listRuns = () => request<RunInfo[]>('/api/v1/runs');
 export const getRun = (id: string) => request<RunInfo>(`/api/v1/runs/${id}`);
 export const retryRun = (id: string) =>
   request<{ requeued: number }>(`/api/v1/runs/${id}/retry`, { method: 'POST' });
+export const generateAppeals = (runId: string, claimIds: string[]) =>
+  request<{ queued: number; skipped: number }>(
+    `/api/v1/runs/${runId}/generate`, json('POST', { claimIds }),
+  );
 export const getRunClaims = (id: string) =>
   request<WorkbenchData>(`/api/v1/runs/${id}/claims`);
 export const getRunAudit = (id: string) =>

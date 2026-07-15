@@ -18,6 +18,7 @@ export interface WorkbenchMutations {
   revertLetter(c: Claim): Promise<string>;
   dismiss(c: Claim, reason?: string): Promise<Claim>;
   restore(c: Claim): Promise<Claim>;
+  generate?(claims: Claim[]): Promise<{ queued: number; skipped: number }>;
 }
 
 export default function App({
@@ -74,6 +75,22 @@ export default function App({
     sel.forEach((c) => downloadLetter(c, letters[c.id]));
     showToast(`${sel.length} letter${sel.length === 1 ? '' : 's'} exported`);
   };
+
+  const onGenerateSelected = mutations?.generate ? () => {
+    const sel = data.claims.filter((c) => selected[c.id]);
+    mutations.generate!(sel).then(({ queued, skipped }) => {
+      setSelected({});
+      setLetters((l) => {
+        const next = { ...l };
+        sel.forEach((c) => delete next[c.id]);
+        return next;
+      });
+      showToast(
+        `Appeal generation queued for ${queued} claim${queued === 1 ? '' : 's'}`
+        + (skipped ? ` · ${skipped} skipped` : ''),
+      );
+    }).catch((e) => showToast(String((e as Error).message ?? e)));
+  } : undefined;
 
   let body: JSX.Element;
   if (screen === 'detail') {
@@ -174,6 +191,7 @@ export default function App({
         onToggleAll={onToggleAll}
         onClearSelection={() => setSelected({})}
         onExportSelected={onExportSelected}
+        onGenerateSelected={onGenerateSelected}
         onOpenClaim={(id) => { setActiveId(id); setScreen('detail'); }}
         statusOverrides={statusOverrides}
       />
