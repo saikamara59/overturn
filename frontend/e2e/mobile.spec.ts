@@ -25,7 +25,8 @@ test('mobile demo: chips + cards replace rail + table; card opens detail', async
   await expect(page.locator('.d-id')).toHaveText(firstId);
   await page.getByRole('button', { name: '← Worklist' }).click();
 
-  // summary renders with the 2×2 stat grid present
+  // summary renders with the stat-card grid present
   await page.getByRole('button', { name: 'Batch Summary' }).click();
   await expect(page.getByText('Records processed')).toBeVisible();
+  await expect(page.locator('.sm-cards')).toBeVisible();
 });

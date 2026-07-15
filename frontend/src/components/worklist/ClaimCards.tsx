@@ -19,7 +19,15 @@ export function ClaimCards(p: Props) {
         <div
           key={c.id}
           className={`claim-card${p.selected[c.id] ? ' sel' : ''}`}
+          role="button"
+          tabIndex={0}
           onClick={() => p.onOpenClaim(c.id)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              p.onOpenClaim(c.id);
+            }
+          }}
         >
           <div className="cc-top">
             <Checkbox

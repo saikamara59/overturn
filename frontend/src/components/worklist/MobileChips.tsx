@@ -27,6 +27,7 @@ export function MobileChips({ claims, filters, onToggle, onReset, statusOverride
           type="button"
           key={`${c.key}:${c.label}`}
           className={`chip${filters[c.key].includes(c.label) ? ' on' : ''}`}
+          aria-pressed={filters[c.key].includes(c.label)}
           onClick={() => onToggle(c.key, c.label)}
         >
           {c.label}
