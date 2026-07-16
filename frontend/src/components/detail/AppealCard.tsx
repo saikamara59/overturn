@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import type { Claim } from '../../types';
+import { MarkdownLite } from '../ui/MarkdownLite';
 
 interface Props {
   claim: Claim;
@@ -80,7 +81,7 @@ export function AppealCard(p: Props) {
           {p.claim.refined && (
             <div className="refined">
               <div className="t">Refined recommendation</div>
-              <div className="b">{p.claim.refined}</div>
+              <div className="b"><MarkdownLite text={p.claim.refined} /></div>
             </div>
           )}
         </>
