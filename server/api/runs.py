@@ -13,13 +13,14 @@ from healthflow_agents.tools.remittance_parser import (
     parse_remittance_csv,
     parse_remittance_json,
 )
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from server.api.deps import OrgContext, current_org, get_session, scoped_run
 from server.api.org import upsert_csv_mapping
 from server.ingest import apply_mapping
-from server.models import AuditEvent, Claim, Run, utcnow
+from server.models import AuditEvent, Claim, Org, Run, utcnow
 from server.payloads import audit_entries, letter_markdown, run_payload, worklist_payload
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -157,6 +158,72 @@ def retry_run(run: Run = Depends(scoped_run)) -> dict:
     run.drafted = sum(1 for c in run.claims if c.status in ("draft_ready", "submitted"))
     run.failed_records = sum(1 for c in run.claims if c.status == "failed")
     return {"requeued": requeued}
+
+
+class GenerateRequest(BaseModel):
+    claimIds: list[str]
+
+
+GENERATABLE = ("draft_ready", "failed")
+
+
+@router.post("/{run_id}/generate")
+def generate_appeals(
+    body: GenerateRequest,
+    run: Run = Depends(scoped_run),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Requeue selected claims for (re)drafting; the worker picks them up."""
+    if run.is_demo:
+        raise HTTPException(409, detail="demo run is read-only")
+    if run.status == "running":
+        # the worker holds this run's counters in memory mid-pass; requeueing
+        # now would let its per-claim commits clobber the recompute below
+        raise HTTPException(409, detail="run is currently drafting — retry when it finishes")
+    if not body.claimIds:
+        raise HTTPException(422, detail="claimIds must not be empty")
+    if not run.dry_run:
+        org = session.get(Org, run.org_id)
+        if org is None or not org.anthropic_key_encrypted:
+            raise HTTPException(
+                422,
+                detail=(
+                    "organization has no API key configured; add a key in "
+                    "Org Settings or re-upload as a dry run"
+                ),
+            )
+    try:
+        wanted = {uuid.UUID(cid) for cid in body.claimIds}
+    except ValueError:
+        raise HTTPException(422, detail="claimIds must be claim UUIDs")
+    by_id = {c.id: c for c in run.claims}
+    unknown = wanted - by_id.keys()
+    if unknown:
+        raise HTTPException(422, detail=f"{len(unknown)} claim id(s) not in this run")
+
+    queued_ids: list[str] = []
+    skipped = 0
+    for cid in wanted:
+        claim = by_id[cid]
+        if claim.status in GENERATABLE:
+            claim.status = "queued"
+            claim.error = None
+            claim.updated_at = utcnow()
+            queued_ids.append(claim.claim_id)
+        else:
+            skipped += 1
+    if queued_ids:
+        run.status = "queued"
+        run.error = None
+        run.finished_at = None
+        # mirror retry: recompute so the worker's increments stay correct
+        run.drafted = sum(1 for c in run.claims if c.status in ("draft_ready", "submitted"))
+        run.failed_records = sum(1 for c in run.claims if c.status == "failed")
+        session.add(AuditEvent(
+            run_id=run.id, ts=utcnow(), event_type="regeneration_requested",
+            details={"count": len(queued_ids), "claim_ids": sorted(queued_ids)[:20]},
+        ))
+    return {"queued": len(queued_ids), "skipped": skipped}
 
 
 def _ordered_claims(session: Session, run_id: uuid.UUID) -> list[Claim]:

@@ -13,6 +13,7 @@ interface Props {
   onExport: () => void;
   onDismiss?: (reason?: string) => void;
   onRestore?: () => void;
+  onRegenerate?: () => void;
   dismissReason?: string;
 }
 
@@ -29,6 +30,7 @@ export function AppealCard(p: Props) {
   const [reason, setReason] = useState('');
   const failed = p.status === 'Failed';
   const dismissed = p.status === 'Dismissed';
+  const inFlight = p.status === 'Queued' || p.status === 'Drafting';
   const hasLetter = !!p.claim.letter;
   return (
     <div className="card appeal-card">
@@ -48,12 +50,21 @@ export function AppealCard(p: Props) {
           </div>
         </div>
       )}
-      {failed || (dismissed && !hasLetter) ? (
+      {inFlight ? (
+        <div className="fail-banner" style={{ background: 'var(--blue-bg)', borderColor: 'var(--line-2)' }}>
+          <div className="t" style={{ color: 'var(--blue-fg)' }}>Drafting in progress</div>
+          <div className="b">
+            This claim is queued for generation — the draft will appear here shortly.
+          </div>
+        </div>
+      ) : failed || (dismissed && !hasLetter) ? (
         <div className="fail-banner">
           <div className="t">No appeal drafted</div>
           <div className="b">
             {p.claim.error ?? 'This record failed during batch processing.'}{' '}
-            Write the appeal manually or re-run the batch for this claim.
+            {p.onRegenerate
+              ? 'Regenerate it below or write the appeal manually.'
+              : 'Write the appeal manually or re-run the batch for this claim.'}
           </div>
         </div>
       ) : (
@@ -79,15 +90,27 @@ export function AppealCard(p: Props) {
           p.onRestore && (
             <button type="button" className="btn-primary" onClick={p.onRestore}>Restore</button>
           )
+        ) : inFlight ? (
+          null
         ) : failed ? (
-          p.onDismiss && !showReason && (
-            <button type="button" className="btn" onClick={() => setShowReason(true)}>Dismiss</button>
-          )
+          <>
+            {p.onRegenerate && (
+              <button type="button" className="btn-primary" onClick={p.onRegenerate}>
+                Regenerate
+              </button>
+            )}
+            {p.onDismiss && !showReason && (
+              <button type="button" className="btn" onClick={() => setShowReason(true)}>Dismiss</button>
+            )}
+          </>
         ) : (
           <>
             <button type="button" className="btn-primary" onClick={p.onApprove}>Approve</button>
             <button type="button" className="btn" onClick={() => textareaRef.current?.focus()}>Edit</button>
             <button type="button" className="btn" onClick={p.onRevert}>Revert draft</button>
+            {p.onRegenerate && (
+              <button type="button" className="btn" onClick={p.onRegenerate}>Regenerate</button>
+            )}
             {p.onDismiss && !showReason && (
               <button type="button" className="btn" onClick={() => setShowReason(true)}>Dismiss</button>
             )}
@@ -113,7 +136,7 @@ export function AppealCard(p: Props) {
           </span>
         )}
         <div className="spacer" />
-        {!failed && !dismissed && (
+        {!failed && !dismissed && !inFlight && (
           <button type="button" className="btn" onClick={p.onExport}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

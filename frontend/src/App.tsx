@@ -18,6 +18,7 @@ export interface WorkbenchMutations {
   revertLetter(c: Claim): Promise<string>;
   dismiss(c: Claim, reason?: string): Promise<Claim>;
   restore(c: Claim): Promise<Claim>;
+  generate?(claims: Claim[]): Promise<{ queued: number; skipped: number }>;
 }
 
 export default function App({
@@ -74,6 +75,27 @@ export default function App({
     sel.forEach((c) => downloadLetter(c, letters[c.id]));
     showToast(`${sel.length} letter${sel.length === 1 ? '' : 's'} exported`);
   };
+
+  const onGenerateSelected = mutations?.generate ? () => {
+    clearTimeout(saveTimer.current);
+    const sel = data.claims.filter((c) => selected[c.id]);
+    const eligible = sel.filter((c) =>
+      ['Draft Ready', 'Failed'].includes(effectiveStatus(c, statusOverrides)));
+    mutations.generate!(sel).then(({ queued, skipped }) => {
+      setSelected({});
+      if (queued > 0) {
+        setLetters((l) => {
+          const next = { ...l };
+          eligible.forEach((c) => delete next[c.id]);
+          return next;
+        });
+      }
+      showToast(
+        `Appeal generation queued for ${queued} claim${queued === 1 ? '' : 's'}`
+        + (skipped ? ` · ${skipped} skipped` : ''),
+      );
+    }).catch((e) => showToast(String((e as Error).message ?? e)));
+  } : undefined;
 
   let body: JSX.Element;
   if (screen === 'detail') {
@@ -148,6 +170,26 @@ export default function App({
             }).catch((e) => showToast(String((e as Error).message ?? e)));
           } : undefined}
           dismissReason={dismissReasons[claim.id] ?? claim.dismissReason ?? undefined}
+          onRegenerate={
+            mutations?.generate
+              && ['Draft Ready', 'Failed'].includes(effectiveStatus(claim, statusOverrides))
+              ? () => {
+                clearTimeout(saveTimer.current);
+                mutations.generate!([claim]).then(({ queued }) => {
+                  if (queued) {
+                    setLetters((l) => {
+                      const next = { ...l };
+                      delete next[claim.id];
+                      return next;
+                    });
+                    showToast(`${claim.id} queued for regeneration`);
+                  } else {
+                    showToast(`${claim.id} cannot be regenerated right now`);
+                  }
+                }).catch((e) => showToast(String((e as Error).message ?? e)));
+              }
+              : undefined
+          }
         />
       );
     }
@@ -174,6 +216,7 @@ export default function App({
         onToggleAll={onToggleAll}
         onClearSelection={() => setSelected({})}
         onExportSelected={onExportSelected}
+        onGenerateSelected={onGenerateSelected}
         onOpenClaim={(id) => { setActiveId(id); setScreen('detail'); }}
         statusOverrides={statusOverrides}
       />
